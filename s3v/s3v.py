@@ -1,8 +1,8 @@
 
 import cmd2
 from pathlib import Path
-from s3core import get_client, lswild, get_locations
-from skin import _i, _e, _p, _err, fmt_size, fmt_date
+from .s3core import get_client, get_locations
+from .skin import _i, _e, _p, _err, fmt_size, fmt_date
 from minio.deleteobjects import DeleteObject
 
 

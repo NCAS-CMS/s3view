@@ -1,14 +1,14 @@
 from setuptools import setup, find_packages
 setup(
-    name='mycommand',
+    name='s3v',
     version='0.1',
-    author='Your Name',
-    author_email='your@email.com',
-    description='My Command Line Tool',
+    author='Bryan Lawrence',
+    author_email='bryan.lawrence@ncas.ac.uk',
+    description='Lightweight tool for investing data files in an s3 repository',
     packages=find_packages(),
-    scripts=['s3v/s3v'], 
+    scripts=['s3v/s3view'], 
     install_requires = [
-        'cmd2>=1,<2',
+        'cmd2>2',
         'pyreadline3;platform_system=="Windows"'
         ]
     )

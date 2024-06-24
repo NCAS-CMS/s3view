@@ -36,7 +36,7 @@ class s3cmd(cmd2.Cmd):
 
     def _confirm(self, message, default='N'):
         defstr = {"Y":'Y/n',"N":'n/Y'}[default]
-        self.poutput(f'{message} [y/n]\n')
+        self.poutput(f'{message} [y/n]')
         while True:
             ans = input()
             if ans == "":
@@ -286,64 +286,50 @@ class s3cmd(cmd2.Cmd):
     mv_args = cmd2.Cmd2ArgumentParser()
     mv_args.add_argument('targets',nargs=2,help='filenames and/or paths to be removed, e.g. mv fileA fileB')
     @cmd2.with_argparser(mv_args)
-    def mv(self, command):
+    def do_mv(self, command):
         """
-        Move files from one location to another (server side)
+        Rename files within a bucket (server side)
         This is an expensive operation!
         """
         try:
-            source, target = tuple(command)
+            source, target = tuple(command.targets)
+            self.poutput(_i('Command is mv ')+ source+ _i(' to ')+target)
         except:
-            self.poutput(_err('Invalid mv command'))
-            return self.cd(self.path)
+            self.poutput(_err(f'Invalid mv command - mv "{command.targets}"'))
+            return self.do_cd(self.path)
+        
+        sfiles = lswild(self.client, self.bucket, source, objects=True)
+        ncopies = len(sfiles)
+        if ncopies == 0:
+            self.poutput(_i('No files match {source}'))
+            return self.do_cd()
+        elif ncopies == 1:
+            if target.endswith('/'):
+                targets = ['f{target}/{sfiles[0].object_name}']
+            else:
+                targets = [target] 
+        elif ncopies > 1:
+            if not target.endswith('/'):
+                self.putput(_err(f'Need a directory target to mv {len(sfiles)} files -  target must end with a /'))
+                return self.do_cd()
+            targets = [f'{target}{o.object_name}' for o in sfiles]
+        volume = fmt_size(sum([o.size for o in sfiles]))
 
-        if target.startswith('/'):
-            target_bucket = self.bucket
-        else:
-            bits = target.split('/')
-            if bits[0] not in self.buckets:
-                self.poutput(_err('Invalid mv command: target must start with a bucket name or /'))
-                return self.cd(self.path)
-            target_bucket = bits[0]
-
-        if target.endswith('/'):
-            singleton = False
-        else:
-            if source.find('*') > -1 or source.endswith('/'):
-                self.poutput(_err('Cannot move multiple files to a target that is not a directory'))
-                return self.cd(self.path)
-            singleton= True
-
-
-        path = self.path + ''.join(source)
-        objects = lswild(self.client, self.bucket, path, objects=True)
-        if singleton:
-            if len(objects) != 1:
-                self.poutput(_err('Unexpected error cannot mv multiple files to one file'))
-                return self.cd(self.path)
-            targets = [target]
-        else:
-            targets = [f'{target}/{o.object_name}' for o in objects]
         self.poutput(_i('\nList of movements:'))
-        for o,t in zip(objects,targets):
+        for o,t in zip(sfiles,targets):
             self.poutput(_e(f'mv {o.object_name} to {t}'))
-        volume = fmt_size(sum([o.size for o in objects]))
         self.poutput(_p('This move is done as a server side copy - it is not "just" a rename!'))
         if self._confirm(_p(f'Move these files ({volume}) ?')):
-            for o,t in zip(objects, targets):
+            for o,t in zip(sfiles, targets):
                 src = CopySource(self.bucket, o.object_name)
-                result = self.client.copy_object(target_bucket, t, src)
-                if singleton:
-                    if o.size != result.size:
-                        self.poutput(_err(f'Failed copy of {o.object_name} - mv operation terminated'))
-                        self.cd(self.path)
-                if not singleton and result.object_name != o.object_name:
+                result = self.client.copy_object(self.bucket, t, src)
+                if o.etag != result.etag:
                     self.poutput(_err(f'Failed copy of {o.object_name} - mv operation terminated'))
-                    self.cd(self.path)
-                self.client.remove_object(self.bucket,o.object_name)
+                    return self.cd(self.path)
                 self.poutput(f'Created {_e(result.object_name)}')
-            
-        return self.cd(self.path)
+                self.client.remove_object(self.bucket,o.object_name)
+
+        return self.do_cd(self.path)
 
 
     def do_pwd(self,arg):

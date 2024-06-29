@@ -358,10 +358,13 @@ class s3cmd(cmd2.Cmd):
     tag_args.add_argument('value',nargs=1, help='Value for tag')
     tag_args.add_argument('key', nargs=1,help='Key for a tag')
     @cmd2.with_argparser(tag_args)
-    def _nocando_tag(self, targets):
-        """ 
+    def do_tag(self, targets):
         """
-     #   
+        Allows users with object stores who support tagging to tag objects dynamically
+        rather than utilise the user metadata option. Many object stores, including
+        the author's one, do not support this. This might work for you, it doesn't
+        work for me. Let me know if it does.
+        """
         if self.bucket is None:
             self.poutput(_err('Need to set bucket before tagging anything'))
             return 
@@ -369,36 +372,22 @@ class s3cmd(cmd2.Cmd):
         key = targets.key[0]
         value = targets.value[0]
         objects = self.client.list_objects(self.bucket,prefix=prefix)
-        print(key,value)
         for o in objects:
             if o.is_dir:
                 continue
             tags = o.tags
-            print(tags, type(tags))
             if tags is None:
                 tags=Tags()
             tags[key]=value
-            self.client.set_object_tags(self.bucket, o.object_name, tags)
+            try:
+                self.client.set_object_tags(self.bucket, o.object_name, tags)
+            except Exception as e:
+                self.poutput(_err(e))
+                self.poutput(_err('Unable to tag object(s), your object store implementation may not support this'))
+                return
 
     tag1_args = cmd2.Cmd2ArgumentParser()
     tag1_args.add_argument('path', nargs=1,help='Path should be a valid object match (i.e. an object path, possibly with a wildcard).')
-    
-    @cmd2.with_argparser(tag1_args)
-    def do_lst(self, targets):
-        """ """
-        
-        if self.bucket is None:
-            self.poutput(_err('Need to set bucket before tagging anything'))
-            return 
-        match = targets.path[0]
-        objects = self.client.list_objects(self.bucket,prefix=self.path)
-        if match is not None:
-            objects = [o for o in objects if Path(o.object_name).match(match)]
-        
-        for o in objects:
-            if o.is_dir:
-                continue
-            self.poutput(f'{o.object_name}: {o.tags} {o.metadata}')
 
 
     def do_pwd(self,arg):

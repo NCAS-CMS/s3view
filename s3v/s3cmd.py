@@ -24,11 +24,12 @@ class s3cmd(cmd2.Cmd):
         if path is None:
             self.prompt = 's3> '
             self._noloc()
+            self.buckets = None
         else:
             self._navconfig(path)
         self.starting = True
         self.mydirs = None
-        self.buckets = None
+        
 
     def _noloc(self):
         locations = " ".join(get_locations())
@@ -141,6 +142,7 @@ class s3cmd(cmd2.Cmd):
             if arg == "":
                 pass
             elif arg != self.alias:
+                print('doing')
                 self._navconfig(arg)
         self.poutput(_i('Buckets:  ')+' '.join(self.buckets))
 

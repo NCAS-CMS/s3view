@@ -5,6 +5,11 @@ from s3v.skin import _i, _e, _p, _err, fmt_size, fmt_date
 from minio.deleteobjects import DeleteObject
 from minio.commonconfig import CopySource
 from minio.tagging import Tags
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def fetch_metadata(client, bucket, file_dict):
+    """ Helper function to clean up calling metadata signature"""
+    return file_dict, client.stat_object(bucket, file_dict['n'])
 
 class s3cmd(cmd2.Cmd):
     """ 
@@ -184,7 +189,6 @@ class s3cmd(cmd2.Cmd):
         """ 
         List the files and directories in a bucket, potentially with a wild card.
         """
-        #TODO: definitly going to want to use async to do those stat metadata calls.
         if self.path is None: 
             self.path = '/'
         extras = arg.path
@@ -202,8 +206,24 @@ class s3cmd(cmd2.Cmd):
                 lf = len(f['n'])
                 if lf > mlen:
                     mlen = lf
-            for f in myfiles:
-                print(f)
+            
+            if arg.long or arg.metadata:
+                mymetadata = []
+                # loop runs with minimum of 32 or the number of processors multiplied by 5, based on Python’s default configuration.
+                with ThreadPoolExecutor() as executor:
+                    futures = {executor.submit(fetch_metadata, self.client, self.bucket, f): f for f in myfiles}
+                    for future in as_completed(futures):
+                        try:
+                            f, result = future.result()
+                            meta = {k[11:]:v for k,v in result.metadata.items() if k.startswith('x-amz-meta')}
+                            mymetadata.append((f, meta))
+                        except Exception as e:
+                            self.poutput(_err('Error fetching metadata {e}'))
+                mymetadata = sorted(mymetadata, key=lambda x: x[0]['n'])
+            else:
+                mymetadata = [(f,None) for f in myfiles]
+
+            for f,meta in mymetadata:
                 string = f"{Path(f['n']).name:<{mlen}}  "
                 if arg.long or arg.size:
                     string += _e(f"{f['s']:>10}")
@@ -212,9 +232,7 @@ class s3cmd(cmd2.Cmd):
                 if arg.tags:
                     string += f"   {f['t']}"
                 if arg.long or arg.metadata:
-                    meta = self.client.stat_object(self.bucket, f['n'])
-                    user_metadata = {k[11:]:v for k,v in meta.metadata.items() if k.startswith('x-amz-meta')}
-                    string += f"  {user_metadata}"
+                    string += f"  {meta}"
                 self.poutput(string)   
         else:
             self.columnize([f"{Path(f['n']).name}" for f in myfiles],display_width=width)

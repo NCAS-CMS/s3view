@@ -4,6 +4,7 @@ from s3v.s3core import get_client, get_locations, lswild
 from s3v.skin import _i, _e, _p, _err, fmt_size, fmt_date
 from minio.deleteobjects import DeleteObject
 from minio.commonconfig import CopySource
+from minio.tagging import Tags
 
 class s3cmd(cmd2.Cmd):
     """ 
@@ -73,7 +74,7 @@ class s3cmd(cmd2.Cmd):
             prefix = None
         else:
             prefix = path
-        objects = self.client.list_objects(self.bucket,prefix=prefix)
+        objects = self.client.list_objects(self.bucket,include_user_meta=True, prefix=prefix)
         if match is not None:
             objects = [o for o in objects if Path(o.object_name).match(match)]
 
@@ -93,7 +94,11 @@ class s3cmd(cmd2.Cmd):
             else:
                 sum += o.size
                 files +=1
-                myfiles.append([o.object_name, fmt_size(o.size), fmt_date(o.last_modified)])
+                myfiles.append({'n':o.object_name, 
+                                's':fmt_size(o.size),
+                                'd':fmt_date(o.last_modified),
+                                't':o.tags,
+                                })
         return sum, files, dirs, mydirs, myfiles
 
     def _cd_lander(self, path):
@@ -165,14 +170,19 @@ class s3cmd(cmd2.Cmd):
         self.path=""
     
     ls_args = cmd2.Cmd2ArgumentParser()
-    ls_args.add_argument('-l', '--long', action='store_true', help='Tabulate size and date as well')
+    ls_args.add_argument('-l', '--long', action='store_true', help='Same as -s -d -m')
+    ls_args.add_argument('-s', '--size', action='store_true',help="Tell us about size")
     ls_args.add_argument('-w', '--width', nargs='?', default=90, type=int, help='width of display for standard output')
+    ls_args.add_argument('-m', '--metadata', action='store_true',help="Show user metadata")
+    ls_args.add_argument('-t', '--tags', action='store_true',help="Show tags")
+    ls_args.add_argument('-d', '--date', action='store_true',help="Show dates")
     ls_args.add_argument('path', nargs='?',help='Path should be a valid path in your current bucket and location, possibly with a wildcard.')
     @cmd2.with_argparser(ls_args)
     def do_ls(self, arg='/'):
         """ 
         List the files and directories in a bucket, potentially with a wild card.
         """
+        #TODO: definitly going to want to use async to do those stat metadata calls.
         if self.path is None: 
             self.path = '/'
         extras = arg.path
@@ -184,16 +194,28 @@ class s3cmd(cmd2.Cmd):
       
         width = arg.width
 
-        if arg.long:
+        if arg.long or arg.metadata or arg.size or arg.date or arg.tags:
             mlen = 0
             for f in myfiles:
-                lf = len(f[0])
+                lf = len(f['n'])
                 if lf > mlen:
                     mlen = lf
             for f in myfiles:
-                self.poutput(f'{Path(f[0]).name:<{mlen}}  '+_e(f'{f[1]:>10}') +f'   {f[2]}')   
+                print(f)
+                string = f"{Path(f['n']).name:<{mlen}}  "
+                if arg.long or arg.size:
+                    string += _e(f"{f['s']:>10}")
+                if arg.long or arg.date:
+                    string += f"   {f['d']}"
+                if arg.tags:
+                    string += f"   {f['t']}"
+                if arg.long or arg.metadata:
+                    meta = self.client.stat_object(self.bucket, f['n'])
+                    user_metadata = {k[11:]:v for k,v in meta.metadata.items() if k.startswith('x-amz-meta')}
+                    string += f"  {user_metadata}"
+                self.poutput(string)   
         else:
-            self.columnize([f'{Path(f[0]).name}' for f in myfiles],display_width=width)
+            self.columnize([f"{Path(f['n']).name}" for f in myfiles],display_width=width)
 
         if len(mydirs) > 0: 
             if len(mydirs) > 3:
@@ -330,6 +352,53 @@ class s3cmd(cmd2.Cmd):
                 self.client.remove_object(self.bucket,o.object_name)
 
         return self.do_cd(self.path)
+
+    tag_args = cmd2.Cmd2ArgumentParser()
+    tag_args.add_argument('path', nargs=1,help='Path should be a valid object match (i.e. an object path, possibly with a wildcard).')
+    tag_args.add_argument('value',nargs=1, help='Value for tag')
+    tag_args.add_argument('key', nargs=1,help='Key for a tag')
+    @cmd2.with_argparser(tag_args)
+    def _nocando_tag(self, targets):
+        """ 
+        """
+     #   
+        if self.bucket is None:
+            self.poutput(_err('Need to set bucket before tagging anything'))
+            return 
+        prefix = targets.path
+        key = targets.key[0]
+        value = targets.value[0]
+        objects = self.client.list_objects(self.bucket,prefix=prefix)
+        print(key,value)
+        for o in objects:
+            if o.is_dir:
+                continue
+            tags = o.tags
+            print(tags, type(tags))
+            if tags is None:
+                tags=Tags()
+            tags[key]=value
+            self.client.set_object_tags(self.bucket, o.object_name, tags)
+
+    tag1_args = cmd2.Cmd2ArgumentParser()
+    tag1_args.add_argument('path', nargs=1,help='Path should be a valid object match (i.e. an object path, possibly with a wildcard).')
+    
+    @cmd2.with_argparser(tag1_args)
+    def do_lst(self, targets):
+        """ """
+        
+        if self.bucket is None:
+            self.poutput(_err('Need to set bucket before tagging anything'))
+            return 
+        match = targets.path[0]
+        objects = self.client.list_objects(self.bucket,prefix=self.path)
+        if match is not None:
+            objects = [o for o in objects if Path(o.object_name).match(match)]
+        
+        for o in objects:
+            if o.is_dir:
+                continue
+            self.poutput(f'{o.object_name}: {o.tags} {o.metadata}')
 
 
     def do_pwd(self,arg):

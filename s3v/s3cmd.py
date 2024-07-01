@@ -286,7 +286,7 @@ class s3cmd(cmd2.Cmd):
             self.cb(None)
         r = self.client.make_bucket(bucket_name)
         self.buckets.append(bucket_name)
-        return self.cb(f'cb {bucket_name}')
+        return self.do_cb(f'cb {bucket_name}')
     
 
     rm_args = cmd2.Cmd2ArgumentParser()

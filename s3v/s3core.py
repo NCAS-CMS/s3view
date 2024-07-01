@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 from minio import Minio
-
+from urllib.parse import quote, unquote
 
 def get_locations(config_file='.mc/config.json'):
     """ 
@@ -81,3 +81,32 @@ def lswild(client, bucket, pattern='*', objects=False):
         object_names = [o.object_name for o in objects]
         flist = [p for p in object_names if Path(p).match(pattern)]
         return flist
+
+def sanitise_metadata(indict):
+    """ 
+    Given a dictionary sanitise the keys and values for 
+    encoding in object store metadata
+    """
+    outdict = {}
+    for k,value in indict.items():
+        kk = k.replace(' ', '-').replace('_', '-')
+        if isinstance(value,list):
+            sanitised_value = quote(json.dumps(value))
+            outdict[kk] = sanitised_value
+        else: 
+            outdict[kk]=quote(value)
+    return outdict
+
+def desanitise_metadata(indict):
+    """ 
+    Given a dictionary which has had values which 
+    have been encoded for an object store, undo
+    that sanitation.
+    """
+    outdict = {}
+    for k,v in indict.items():
+        if v.startswith('%5B'):
+            outdict[k]=json.loads(unquote(v))
+        else:
+            outdict[k]=unquote(v)
+    return outdict

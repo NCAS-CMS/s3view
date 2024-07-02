@@ -85,11 +85,13 @@ def lswild(client, bucket, pattern='*', objects=False):
 def sanitise_metadata(indict):
     """ 
     Given a dictionary sanitise the keys and values for 
-    encoding in object store metadata
+    encoding in object store metadata. Note AWS
+    encodes keys in lower case, can't do anhyting about
+    that.
     """
     outdict = {}
     for k,value in indict.items():
-        kk = k.replace(' ', '-').replace('_', '-')
+        kk = k.replace(' ', '-').replace('_', '-').lower()
         if isinstance(value,list):
             sanitised_value = quote(json.dumps(value))
             outdict[kk] = sanitised_value

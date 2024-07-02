@@ -1,6 +1,6 @@
 import cmd2
 from pathlib import Path
-from s3v.s3core import get_client, get_locations, lswild
+from s3v.s3core import get_client, get_locations, lswild, desanitise_metadata
 from s3v.skin import _i, _e, _p, _err, fmt_size, fmt_date
 from minio.deleteobjects import DeleteObject
 from minio.commonconfig import CopySource
@@ -216,9 +216,9 @@ class s3cmd(cmd2.Cmd):
                         try:
                             f, result = future.result()
                             meta = {k[11:]:v for k,v in result.metadata.items() if k.startswith('x-amz-meta')}
-                            mymetadata.append((f, meta))
+                            mymetadata.append((f, desanitise_metadata(meta)))
                         except Exception as e:
-                            self.poutput(_err('Error fetching metadata {e}'))
+                            self.poutput(_err(f'Error fetching metadata {e}'))
                 mymetadata = sorted(mymetadata, key=lambda x: x[0]['n'])
             else:
                 mymetadata = [(f,None) for f in myfiles]
@@ -232,7 +232,10 @@ class s3cmd(cmd2.Cmd):
                 if arg.tags:
                     string += f"   {f['t']}"
                 if arg.long or arg.metadata:
-                    string += f"  {meta}"
+                    pretty_meta = '  {'
+                    for k,v in meta.items():
+                        pretty_meta += _e(k)+f': {v}, '
+                    string += pretty_meta[:-2]+'}'
                 self.poutput(string)   
         else:
             self.columnize([f"{Path(f['n']).name}" for f in myfiles],display_width=width)

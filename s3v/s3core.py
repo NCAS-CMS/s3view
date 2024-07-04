@@ -93,7 +93,7 @@ def sanitise_metadata(indict):
     for k,value in indict.items():
         kk = k.replace(' ', '-').replace('_', '-').lower()
         if isinstance(value,list):
-            sanitised_value = quote(json.dumps(value))
+            sanitised_value = "json_"+quote(json.dumps(value))
             outdict[kk] = sanitised_value
         else: 
             outdict[kk]=quote(value)
@@ -107,8 +107,8 @@ def desanitise_metadata(indict):
     """
     outdict = {}
     for k,v in indict.items():
-        if v.startswith('%5B'):
-            outdict[k]=json.loads(unquote(v))
+        if v.startswith('json_'):
+            outdict[k]=json.loads(unquote(v[5:]))
         else:
             outdict[k]=unquote(v)
     return outdict

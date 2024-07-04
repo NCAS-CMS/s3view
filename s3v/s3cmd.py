@@ -11,6 +11,20 @@ def fetch_metadata(client, bucket, file_dict):
     """ Helper function to clean up calling metadata signature"""
     return file_dict, client.stat_object(bucket, file_dict['n'])
 
+def match_metadata(client, bucket, object_name, matches):
+    """ Helper function to grab only files with metadata matches"""
+    result = client.stat_object(bucket, object_name)
+    meta = {k[11:]:v for k,v in result.metadata.items() if k.startswith('x-amz-meta')}
+    meta = desanitise_metadata(meta)
+    for k,v in matches.items():
+        if k not in meta:
+            return False, object_name
+        else:
+            if meta[k]!=v:
+                return False, object_name  
+    return True, object_name
+
+
 class s3cmd(cmd2.Cmd):
     """ 
     Provides a view into one or more S3 repositories
@@ -189,6 +203,20 @@ class s3cmd(cmd2.Cmd):
         """ 
         List the files and directories in a bucket, potentially with a wild card.
         """
+
+        def reorder(mymeta):
+            """ More interesting order of user metadta """
+            copied = [k for k in mymeta]
+            priority_order = ['standard-name','long-name','domain','shape']
+            result = {}
+            for p in priority_order:
+                if p in copied:
+                    result[p]=mymeta[p]
+                    copied.remove(p)
+            for p in copied:
+                result[p]=mymeta[p]
+            return result
+
         if self.path is None: 
             self.path = '/'
         extras = arg.path
@@ -232,10 +260,16 @@ class s3cmd(cmd2.Cmd):
                 if arg.tags:
                     string += f"   {f['t']}"
                 if arg.long or arg.metadata:
-                    pretty_meta = '  {'
+                    if arg.long:
+                        pretty_meta ='  {'
+                    else:
+                        pretty_meta = '\n   {'
+                    meta = reorder(meta)
                     for k,v in meta.items():
                         pretty_meta += _e(k)+f': {v}, '
                     string += pretty_meta[:-2]+'}'
+                    if not arg.long:
+                        string +='\n'
                 self.poutput(string)   
         else:
             self.columnize([f"{Path(f['n']).name}" for f in myfiles],display_width=width)
@@ -247,6 +281,48 @@ class s3cmd(cmd2.Cmd):
             else:
                 self.poutput(_i('Sub-directories are : ')+_e('  '.join([f'{d[0]}({d[1]})' for d in mydirs])))
 
+    
+    fi_args = cmd2.Cmd2ArgumentParser()
+    fi_args.add_argument('-p', '--path', default=None, help='path prefix in which you want to find the metadata matches')
+    fi_args.add_argument('-w', '--width', nargs='?', default=90, type=int, help='width of display for standard output')
+    fi_args.add_argument('keyvals',nargs='*', help="Metadata key-value pairs in the format key=value which you want to match")
+    @cmd2.with_argparser(fi_args)
+    def do_match(self, args):
+        """
+        Find files which match a set of metadata expressed as key value pairs, optionally matching a particular path
+        """ 
+        if self.bucket is None:
+            self.poutput(_err('Must select bucket'))
+            return
+        path = args.path
+        pairs = {}
+        for kv in args.keyvals:
+            if "=" in kv:
+                k,v = kv.split('=',1)
+                pairs[k]=v
+            else:
+                self.poutput(_err('Invalid key pair: ')+kv)
+                return
+        objects = self.client.list_objects(self.bucket, prefix=self.path)
+        if path is not None:
+            objects = [o for o in objects if Path(o.object_name).match(path)]
+
+        matches = []
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(match_metadata, self.client, self.bucket, o.object_name, pairs): o for o in objects}
+            for future in as_completed(futures):
+                try:
+                    status, name = future.result()
+                    if status:
+                        matches.append(name)
+                except Exception as e:
+                    self.poutput(_err(f'Error fetching metadata for {name} {e}'))
+        if matches == []:
+            self.poutput(_e('No matches'))
+        else:
+            self.columnize(matches,display_width=args.width)
+
+    
     cd_args = cmd2.Cmd2ArgumentParser()
     cd_args.add_argument('path', nargs='?',help='Path should be a valid path in your current bucket and location.')
     @cmd2.with_argparser(cd_args)

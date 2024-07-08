@@ -6,6 +6,7 @@ from minio.deleteobjects import DeleteObject
 from minio.commonconfig import CopySource
 from minio.tagging import Tags
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from s3v.s3sci import cfread
 
 def fetch_metadata(client, bucket, file_dict):
     """ Helper function to clean up calling metadata signature"""
@@ -48,7 +49,6 @@ class s3cmd(cmd2.Cmd):
             self._navconfig(path)
         self.starting = True
         self.mydirs = None
-        
 
     def _noloc(self):
         locations = " ".join(get_locations())
@@ -487,8 +487,6 @@ class s3cmd(cmd2.Cmd):
 
     tag1_args = cmd2.Cmd2ArgumentParser()
     tag1_args.add_argument('path', nargs=1,help='Path should be a valid object match (i.e. an object path, possibly with a wildcard).')
-
-
     def do_pwd(self,arg):
         """
         Do the equivalent of a print working directory, that is, show whwere you are in the 
@@ -507,6 +505,30 @@ class s3cmd(cmd2.Cmd):
                 self.poutput(_i('Current working directory ') + path + _i(' in bucket ') + self.bucket)
             else:
                 self.do_lb()
+
+    cfd_args = cmd2.Cmd2ArgumentParser()
+    cfd_args.add_argument('object', nargs=1,help='object should be a valid object in your current bucket and location.')
+    @cmd2.with_argparser(cfd_args)
+    def do_cflist(self, arg):
+        """ cfdump a remote object """
+        if self.bucket is None:
+            self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
+            return
+        flist, output = cfread(self.alias,self.bucket, self.path, arg.object[0])
+        for o in output:
+            self.poutput(o)
+
+    def complete_cflist(self, text, line, start_index, end_index):
+        """ Used for tab completing cfdump """
+        prefix = self.__handle_path(text)
+        myobjs = [o.object_name for o in self.client.list_objects(self.bucket,prefix=prefix) if not o.is_dir]
+        if text:
+            return [
+                adir for adir in myobjs
+                if adir.startswith(text)
+            ]
+        else:
+            return myobjs
 
     def default(self,arg):
         if not self.starting:

@@ -508,13 +508,17 @@ class s3cmd(cmd2.Cmd):
 
     cfd_args = cmd2.Cmd2ArgumentParser()
     cfd_args.add_argument('object', nargs=1,help='object should be a valid object in your current bucket and location.')
+    cfd_args.add_argument('-c','--complete',action='store_true', help='Display complete descriptions of cf fields')
+    cfd_args.add_argument('-s','--short',action='store_true', help='Display short descriptions of cf fields')
+    
     @cmd2.with_argparser(cfd_args)
     def do_cflist(self, arg):
-        """ cfdump a remote object """
+        """ cflist a remote object """
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
             return
-        flist, output = cfread(self.alias,self.bucket, self.path, arg.object[0])
+        flist, output = cfread(self.alias,self.bucket, self.path, arg.object[0], 
+                               short= arg.short, complete=arg.complete)
         for o in output:
             self.poutput(o)
 

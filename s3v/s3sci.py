@@ -20,7 +20,7 @@ class Capturing(list):
         del self._stringio    # free up some memory
         sys.stdout = self._stdout
 
-def cfread(alias, bucket, path, object):
+def cfread(alias, bucket, path, object, short=False, complete=False):
     """ 
     Read and lazy load cf fields from a particular path via S3
     """
@@ -39,10 +39,15 @@ def cfread(alias, bucket, path, object):
     fstart = fstart.replace('s3s:','s3:')
     fpath = fstart +'/'.join(bits)
     with Capturing() as output:
-        print('going', fpath)
         flist = cf.read(fpath,storage_options=storage_options)
-        for f in flist:
-            print(f)
+        if complete:
+            for f in flist:
+                print(f.dump())
+        elif short:
+            print(flist)
+        else:
+            for f in flist:
+                print(f)
     return flist, output
 
     

@@ -1,0 +1,11 @@
+---
+name: s3view
+channels:
+  - conda-forge
+  - nodefaults
+
+dependencies:
+  - cmd2 >1
+  - cf-python >=3.16.2  # 3.17.0 n/a yet on conda-forge
+  - minio
+  - python >=3.10

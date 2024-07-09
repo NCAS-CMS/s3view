@@ -9,6 +9,8 @@ setup(
     scripts=['s3v/s3view'], 
     install_requires = [
         'cmd2>2',
+        'cf-python>=3.16.2',  # 3.17 n/a yet on PyPI
+        'minio',
         'pyreadline3;platform_system=="Windows"'
         ]
     )

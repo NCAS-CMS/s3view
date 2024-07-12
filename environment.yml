@@ -15,4 +15,4 @@ dependencies:
   # remove when using conda-forge cf-python
   - udunits2
   - pip:
-    - git+https://github.com/NCAS-CMS/cf-python@main  # edit branch here
+    - git+https://github.com/davidhassell/cfdm.git@h5-read-hdf5-chunks-hack

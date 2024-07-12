@@ -6,6 +6,13 @@ channels:
 
 dependencies:
   - cmd2 >1
-  - cf-python >=3.16.2  # 3.17.0 n/a yet on conda-forge
+  # use for conda-forge package, when available
+  # - cf-python >=3.17.0
   - minio
+  - pip
   - python >=3.10
+  # needed by cf-python; not in cf-python PyPI/git recipe
+  # remove when using conda-forge cf-python
+  - udunits2
+  - pip:
+    - git+https://github.com/NCAS-CMS/cf-python@main  # edit branch here

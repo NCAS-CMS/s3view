@@ -52,7 +52,7 @@ class s3cmd(cmd2.Cmd):
 
     def _noloc(self):
         locations = " ".join(get_locations())
-        self.poutput(_i('Your available minio locations are :')+locations)
+        self.poutput(_i('Your available minio locations are: ')+locations)
         self.poutput(_i('Choose one with "loc x" '))
 
     def _confirm(self, message, default='N'):
@@ -170,8 +170,12 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(loc_args)
     def do_loc(self, arg):
         "Set context to a particular minio S3 location as described in user minio config file"
-        self._navconfig(arg.alias)    
-        self.do_lb()
+        try:
+            self._navconfig(arg.alias)
+            self.do_lb()
+        except ValueError:
+            self.poutput(_err(f'Location {arg.alias} not in your minio config file '))
+            self._noloc()
 
     cb_args = cmd2.Cmd2ArgumentParser()
     cb_args.add_argument('bucket', help='Bucket should be a valid bucket in your current location')
@@ -197,7 +201,9 @@ class s3cmd(cmd2.Cmd):
     ls_args.add_argument('-m', '--metadata', action='store_true',help="Show user metadata")
     ls_args.add_argument('-t', '--tags', action='store_true',help="Show tags")
     ls_args.add_argument('-d', '--date', action='store_true',help="Show dates")
+    ls_args.add_argument('-o', '--order', nargs='?', help="Order by size|date")
     ls_args.add_argument('path', nargs='?',help='Path should be a valid path in your current bucket and location, possibly with a wildcard.')
+ 
     @cmd2.with_argparser(ls_args)
     def do_ls(self, arg='/'):
         """ 
@@ -219,7 +225,12 @@ class s3cmd(cmd2.Cmd):
 
         if self.path is None: 
             self.path = '/'
+        
         extras = arg.path
+        if arg.order not in [None, 'size', 'date']:
+            print(arg.order)
+            self.poutput(_err('Unrecognised order option'))
+
         volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras)
         self.poutput(_i('Location: ') + self.path + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))
         directory = 'directory' 
@@ -251,6 +262,7 @@ class s3cmd(cmd2.Cmd):
             else:
                 mymetadata = [(f,None) for f in myfiles]
 
+            strings = []
             for f,meta in mymetadata:
                 string = f"{Path(f['n']).name:<{mlen}}  "
                 if arg.long or arg.size:
@@ -270,7 +282,18 @@ class s3cmd(cmd2.Cmd):
                     string += pretty_meta[:-2]+'}'
                     if not arg.long:
                         string +='\n'
-                self.poutput(string)   
+                strings.append({'s':string,'d':[f['d']],'v':f['s']})
+            
+            match arg.order:
+                case None:
+                    pass
+                case 'size':
+                    strings = sorted(strings, key=lambda x: float(x['v'].rstrip('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')))
+                case 'date':
+                    strings = sorted(strings, key=lambda x: x['d'])
+            for s in strings:
+                self.poutput(s['s'])
+                    
         else:
             self.columnize([f"{Path(f['n']).name}" for f in myfiles],display_width=width)
 

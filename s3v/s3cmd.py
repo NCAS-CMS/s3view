@@ -7,6 +7,7 @@ from minio.commonconfig import CopySource
 from minio.tagging import Tags
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from s3v.s3sci import cfread
+import bitmath
 
 def fetch_metadata(client, bucket, file_dict):
     """ Helper function to clean up calling metadata signature"""
@@ -288,7 +289,7 @@ class s3cmd(cmd2.Cmd):
                 case None:
                     pass
                 case 'size':
-                    strings = sorted(strings, key=lambda x: float(x['v'].rstrip('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')))
+                    strings = sorted(strings, key=lambda x: bitmath.parse_string(x['v']))
                 case 'date':
                     strings = sorted(strings, key=lambda x: x['d'])
             for s in strings:

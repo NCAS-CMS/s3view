@@ -40,7 +40,7 @@ class s3cmd(cmd2.Cmd):
         
         self.poutput(_i('You have entered a lightweight management tool for organising "files" inside an S3 object store'))
         self.prompt = 's3> '
-        self.debug = True
+        self.debug = False
         self.alias, self.bucket, self.path = None, None, None
         if path is None:
             self.prompt = 's3> '
@@ -50,7 +50,7 @@ class s3cmd(cmd2.Cmd):
             self._navconfig(path)
         self.starting = True
         self.mydirs = None
-
+       
     def _noloc(self):
         locations = " ".join(get_locations())
         self.poutput(_i('Your available minio locations are: ')+locations)
@@ -541,13 +541,31 @@ class s3cmd(cmd2.Cmd):
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
             return
-        flist, output = cfread(self.alias,self.bucket, self.path, arg.object[0], 
-                               short= arg.short, complete=arg.complete)
-        for o in output:
-            self.poutput(o)
+        
+        if '*' in arg.object[0]:
+            if self.path is None: 
+                self.path = '/'
+        
+            extras = arg.object[0]
+            volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras)
+            input_files = [f['n'] for f in myfiles]
+            self.poutput(_i(f'Detailed listing for {len(myfiles)} files may be slow, consider using -m option instead (if possible).'))
+        else:
+            input_files = [arg.object[0],]
+
+        for input_file in input_files:
+            flist, output = cfread(self.alias,self.bucket, self.path, input_file, 
+                                short= arg.short, complete=arg.complete)
+            for o in output:
+                self.poutput(o)
 
     def complete_cflist(self, text, line, start_index, end_index):
         """ Used for tab completing cfdump """
+        
+        #handle misuse of tab completion gracefully
+        if text =='*':
+            raise ValueError('Cannot tab complete wildcards')
+        
         prefix = self.__handle_path(text)
         myobjs = [o.object_name for o in self.client.list_objects(self.bucket,prefix=prefix) if not o.is_dir]
         if text:

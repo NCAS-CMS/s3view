@@ -7,7 +7,11 @@ from minio.commonconfig import CopySource
 from minio.tagging import Tags
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from s3v.s3sci import cfread
+from s3v.drs_view import drs_view, drs_metaview
 import bitmath
+
+import logging
+logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 
 def fetch_metadata(client, bucket, file_dict):
     """ Helper function to clean up calling metadata signature"""
@@ -155,6 +159,22 @@ class s3cmd(cmd2.Cmd):
                 return {True:'',False:p}[p=='.']
         else:
             return self.path + path
+        
+
+    def _getmetadata(self, myfiles):
+        mymetadata = []
+        # loop runs with minimum of 32 or the number of processors multiplied by 5, based on Python’s default configuration.
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(fetch_metadata, self.client, self.bucket, f): f for f in myfiles}
+            for future in as_completed(futures):
+                try:
+                    f, result = future.result()
+                    meta = {k[11:]:v for k,v in result.metadata.items() if k.startswith('x-amz-meta')}
+                    mymetadata.append((f, desanitise_metadata(meta)))
+                except Exception as e:
+                    self.poutput(_err(f'Error fetching metadata {e}'))
+        mymetadata = sorted(mymetadata, key=lambda x: x[0]['n'])
+        return mymetadata
 
     def do_lb(self,arg=None):
         """ Navigate around a S3 service"""
@@ -248,18 +268,7 @@ class s3cmd(cmd2.Cmd):
                     mlen = lf
             
             if arg.long or arg.metadata:
-                mymetadata = []
-                # loop runs with minimum of 32 or the number of processors multiplied by 5, based on Python’s default configuration.
-                with ThreadPoolExecutor() as executor:
-                    futures = {executor.submit(fetch_metadata, self.client, self.bucket, f): f for f in myfiles}
-                    for future in as_completed(futures):
-                        try:
-                            f, result = future.result()
-                            meta = {k[11:]:v for k,v in result.metadata.items() if k.startswith('x-amz-meta')}
-                            mymetadata.append((f, desanitise_metadata(meta)))
-                        except Exception as e:
-                            self.poutput(_err(f'Error fetching metadata {e}'))
-                mymetadata = sorted(mymetadata, key=lambda x: x[0]['n'])
+                mymetadata = self._getmetadata(myfiles)
             else:
                 mymetadata = [(f,None) for f in myfiles]
 
@@ -530,11 +539,40 @@ class s3cmd(cmd2.Cmd):
             else:
                 self.do_lb()
 
+    
+
+    drs_args = cmd2.Cmd2ArgumentParser()
+    drs_args.add_argument('path', nargs='?',help='Path should be a valid path in your current bucket and location, possibly with a wildcard.')
+    drs_args.add_argument('drs', nargs='?', 
+                          default='[Variable,Source,Experiment,Variant,Frequency,Period,nFields]',
+                          help='Python list of DRS components to be used for contents (ignored for metadata option)')
+    drs_args.add_argument('-s','--short',default='[]',help='Python list of DRS terms where short lists are wanted')
+    drs_args.add_argument('-u','--use_metadata',action='store_true',help="build drs-like view from metadata")
+    @cmd2.with_argparser(drs_args)
+    def do_drsview(self,arg):
+        """ Extract DRS components at location """
+
+        if self.bucket is None:
+            self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
+            return
+
+        if self.path is None:
+            self.path = '/'
+        extras = arg.path
+        volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras)
+
+        if arg.use_metadata:
+            mymetadata = self._getmetadata(myfiles)
+            drs_metaview(mymetadata, collapse=arg.short)
+        else:
+            myfiles = [f['n'] for f in myfiles]
+            drs_view(myfiles, arg.drs, collapse=arg.short)
+            
+        
     cfd_args = cmd2.Cmd2ArgumentParser()
     cfd_args.add_argument('object', nargs=1,help='object should be a valid object in your current bucket and location.')
     cfd_args.add_argument('-c','--complete',action='store_true', help='Display complete descriptions of cf fields')
     cfd_args.add_argument('-s','--short',action='store_true', help='Display short descriptions of cf fields')
-    
     @cmd2.with_argparser(cfd_args)
     def do_cflist(self, arg):
         """ cflist a remote object """

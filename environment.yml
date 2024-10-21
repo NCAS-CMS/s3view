@@ -1,0 +1,18 @@
+---
+name: s3view
+channels:
+  - conda-forge
+  - nodefaults
+
+dependencies:
+  - cmd2 >1
+  # use for conda-forge package, when available
+  # - cf-python >=3.17.0
+  - minio
+  - pip
+  - python >=3.10
+  # needed by cf-python; not in cf-python PyPI/git recipe
+  # remove when using conda-forge cf-python
+  - udunits2
+  - pip:
+    - git+https://github.com/davidhassell/cfdm.git@h5-read-hdf5-chunks-hack

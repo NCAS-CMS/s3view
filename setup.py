@@ -9,6 +9,9 @@ setup(
     scripts=['s3v/s3view'], 
     install_requires = [
         'cmd2>2',
-        'pyreadline3;platform_system=="Windows"'
+        'pyreadline3;platform_system=="Windows"',
+        'minio',
+        'bitmath',
+        'pytest','pytest-mock',
         ]
     )

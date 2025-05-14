@@ -54,6 +54,7 @@ class s3cmd(cmd2.Cmd):
             self._navconfig(path)
         self.starting = True
         self.mydirs = None
+        self.maybe_anon = False
 
         self.hidden_commands = {'eof','_relative_run_script',
             'alias', 'macro', 'edit', 'run_pyscript', 'run_script',
@@ -96,7 +97,16 @@ class s3cmd(cmd2.Cmd):
             self.alias = bits[0]
             self.prompt = _p(f'{self.alias}> ')
             self.client = get_client(self.alias)
-            self.buckets = [b.name for b in self.client.list_buckets()]
+            try:
+                self.buckets = [b.name for b in self.client.list_buckets()]
+            except Exception as e:
+                if 'Access Denied' in str(e):
+                    self.poutput(_err(f'Access Denied to {self.alias}, you may still be able to cb into anonymous buckets'))
+                    self.maybe_anon = True
+                    self.bucket = self.alias
+                    self.path = None
+                    return 
+
         match len(bits):
             case 1: 
                 self.bucket = None
@@ -107,16 +117,19 @@ class s3cmd(cmd2.Cmd):
             case 3:
                 self.bucket = bits[1]
                 self.path = bits[2]
-
+    
     def _recurse(self, path, match=None):
         """ 
-        From a given path, head down the tree and do some summing
+        From a given path, head down the tree and do some summing.
+        We can constrain ourself to a set of matching objects.
         """
         if path == "":
             prefix = None
         else:
             prefix = path
+        # this is a generator
         objects = self.client.list_objects(self.bucket,include_user_meta=True, prefix=prefix)
+
         if match is not None:
             objects = [o for o in objects if Path(o.object_name).match(match)]
 
@@ -210,7 +223,8 @@ class s3cmd(cmd2.Cmd):
         "Set context to a particular minio S3 location as described in user minio config file"
         try:
             self._navconfig(arg.alias)
-            self.do_lb()
+            if not self.maybe_anon:
+                self.do_lb()
         except ValueError:
             self.poutput(_err(f'Location {arg.alias} not in your minio config file '))
             self._noloc()
@@ -224,9 +238,9 @@ class s3cmd(cmd2.Cmd):
         notion of a bucket is quite different in S3 from that of a directory. Get used to it.
         """
         bucket = arg.bucket
-        if bucket not in self.buckets:
+        if not self.maybe_anon and bucket not in self.buckets:
             self.poutput(_err(f'Bucket [{bucket}] does not exist'))
-        else:
+        else:    
             self.bucket = bucket
             volume, nfiles, ndirs, mydirs, myfiles = self._recurse('')
             self.poutput(_i('Bucket: ') + bucket + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))

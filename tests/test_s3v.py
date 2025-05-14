@@ -38,9 +38,6 @@ def test_s3v_init(mock_s3v):
     assert mock_s3v.path is None
     # Add more assertions based on the expected initial state of s3v
 
-# Add more test functions for other methods in the s3v class
-
-
 # Test for the do_cb method
 def test_do_cb_changes_bucket(capsys, mock_s3v):
     

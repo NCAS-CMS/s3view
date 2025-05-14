@@ -54,6 +54,23 @@ class s3cmd(cmd2.Cmd):
             self._navconfig(path)
         self.starting = True
         self.mydirs = None
+
+        self.hidden_commands = {'eof','_relative_run_script',
+            'alias', 'macro', 'edit', 'run_pyscript', 'run_script',
+            'shortcuts', 'shell', 'py', 'history', 'set', 'suspend'
+        }
+
+    def get_names(self):
+        # This method returns a list of all command method names
+        names = super().get_names()
+        filtered = []
+        for name in names:
+            if name.startswith("do_"):
+                cmd_name = name[3:]
+                if cmd_name in self.hidden_commands:
+                    continue
+            filtered.append(name)
+        return filtered
        
     def _noloc(self):
         locations = " ".join(get_locations())

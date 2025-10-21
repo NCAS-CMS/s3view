@@ -1,0 +1,5 @@
+.conda
+__pycache__
+.pytest_cache
+.vscode
+dist

@@ -1,0 +1,82 @@
+[build-system]
+requires = [
+    "setuptools >= 40.6.0",
+    "setuptools_scm>=6.2",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+authors = [
+    {name = "Bryan Lawrence", email = "bryan.lawrence@ncas.ac.uk"},
+]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+]
+dynamic = [
+    "readme",
+    "version",
+]
+dependencies = [
+    'cmd2>2',
+    'pyreadline3;platform_system=="Windows"',
+    'minio',
+    'bitmath',
+    'cf-python',
+    'pyfive',
+    'fsspec'
+]
+description = "Lightweight tool for investigating data files in an s3 repository"
+license = {text = "BSD License, Version 3-Clause"}
+name = "s3v"
+requires-python = ">=3.10"
+
+[project.scripts]
+s3view = "s3v.s3view:main"
+
+[project.optional-dependencies]
+test = [
+   'pytest',
+   'pytest-mock',
+]
+dev = [
+    'pytest',
+    'pytest-mock',
+    'ipython'
+]
+
+# needed for doc builds
+doc = [
+    "autodocsumm",
+    "sphinx",
+    "sphinx_rtd_theme",
+]
+# develop = [
+#     "pre-commit",
+#     "pylint",
+#     "pydocstyle",
+# ]
+
+
+#[project.urls]
+# Documentation = ""
+
+[tool.setuptools]
+include-package-data = true
+license-files = ["LICENSE"]
+packages = ["s3v"]
+zip-safe = false  # possibly yes
+
+[tool.setuptools.dynamic]
+readme = {file = "README.md", content-type = "text/markdown"}
+
+

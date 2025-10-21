@@ -6,9 +6,11 @@ from minio.deleteobjects import DeleteObject
 from minio.commonconfig import CopySource
 from minio.tagging import Tags
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from s3v.s3sci import cfread
+import itertools
+
 from s3v.drs_view import drs_view, drs_metaview
 import bitmath
+import sys
 
 import logging
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
@@ -96,7 +98,12 @@ class s3cmd(cmd2.Cmd):
         if bits[0]!=self.alias:
             self.alias = bits[0]
             self.prompt = _p(f'{self.alias}> ')
-            self.client = get_client(self.alias)
+            try:
+                self.client = get_client(self.alias)
+            except ValueError as e:
+                self.poutput(_err(e))
+                sys.exit(1)
+
             try:
                 self.buckets = [b.name for b in self.client.list_buckets()]
             except Exception as e:
@@ -118,10 +125,11 @@ class s3cmd(cmd2.Cmd):
                 self.bucket = bits[1]
                 self.path = bits[2]
     
-    def _recurse(self, path, match=None):
+    def _recurse(self, path, match=None, limit=None):
         """ 
         From a given path, head down the tree and do some summing.
         We can constrain ourself to a set of matching objects.
+        We can also constain how many objects we want to look at.
         """
         if path == "":
             prefix = None
@@ -129,6 +137,11 @@ class s3cmd(cmd2.Cmd):
             prefix = path
         # this is a generator
         objects = self.client.list_objects(self.bucket,include_user_meta=True, prefix=prefix)
+
+        # if we are limited, we can collapse our generator to a list
+        if limit is not None:
+            objects = list(itertools.islice(objects,limit))
+          
 
         if match is not None:
             objects = [o for o in objects if Path(o.object_name).match(match)]
@@ -254,6 +267,7 @@ class s3cmd(cmd2.Cmd):
     ls_args.add_argument('-t', '--tags', action='store_true',help="Show tags")
     ls_args.add_argument('-d', '--date', action='store_true',help="Show dates")
     ls_args.add_argument('-o', '--order', nargs='?', help="Order by size|date")
+    ls_args.add_argument('-n', '--max_number', type=int, help='Limit the number of files returned')
     ls_args.add_argument('path', nargs='?',help='Path should be a valid path in your current bucket and location, possibly with a wildcard.')
  
     @cmd2.with_argparser(ls_args)
@@ -277,18 +291,27 @@ class s3cmd(cmd2.Cmd):
 
         if self.path is None: 
             self.path = '/'
+
+        if arg.max_number is not None:
+            limit = arg.max_number
+        else:
+            limit = None
         
         extras = arg.path
         if arg.order not in [None, 'size', 'date']:
             print(arg.order)
             self.poutput(_err('Unrecognised order option'))
 
-        volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras)
-        self.poutput(_i('Location: ') + self.path + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))
-        directory = 'directory' 
-        if extras: directory = "match"
-        self.poutput(_i(f'This {directory} contains ')+ str(len(myfiles)) + _i(' files and ') + str(len(mydirs)) + _i(' directories.'))
-      
+        volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras, limit=limit)
+        if limit is None:
+            self.poutput(_i('Location: ') + self.path + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))
+            directory = 'directory'
+            if extras: directory = "match"
+            self.poutput(_i(f'This {directory} contains ')+ str(len(myfiles)) + _i(' files and ') + str(len(mydirs)) + _i(' directories.'))
+        else:
+            self.poutput(_i(f'Listing {max(nfiles,limit)} files/objects ('+fmt_size(volume)+')'))
+            
+
         width = arg.width
 
         if arg.long or arg.metadata or arg.size or arg.date or arg.tags:
@@ -607,6 +630,7 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(cfd_args)
     def do_cflist(self, arg):
         """ cflist a remote object """
+        from s3v.s3sci import cfread
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
             return

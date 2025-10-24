@@ -1,7 +1,9 @@
 from pathlib import Path
+from io import StringIO
 import json
 from minio import Minio
 from urllib.parse import quote, unquote
+import sys
 
 def get_locations(config_file='.mc/config.json'):
     """ 
@@ -112,3 +114,20 @@ def desanitise_metadata(indict):
         else:
             outdict[k]=unquote(v)
     return outdict
+
+class Capturing(list):
+    """ 
+    Used to capture output from science functions that have internal print statements.
+    Usage for calling my_function:
+        with Capturing() as output_list:
+            my_function(my_arguments)
+    output_list will be a list of output strings
+    """
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        del self._stringio    # free up some memory
+        sys.stdout = self._stdout

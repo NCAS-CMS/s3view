@@ -669,6 +669,45 @@ class s3cmd(cmd2.Cmd):
         else:
             return myobjs
 
+    p5d_args = cmd2.Cmd2ArgumentParser()
+    p5d_args.add_argument('object', nargs=1,help='object should be a valid HDF5 or NC4 file in your current bucket and location.')
+    p5d_args.add_argument('-s','--special',action='store_true', help='Display special attributes of datasets in files (NOT IMPLEMENTED)')
+    @cmd2.with_argparser(p5d_args)
+    def do_p5list(self, arg):
+        """ Use pyfive to approximate a ncdump -h on a remote object """
+        from s3v.p5inspect import p5view
+        if self.bucket is None:
+            self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
+            return
+        
+        input_files = [arg.object[0],]
+
+        for input_file in input_files:
+            output = p5view(self.alias,self.bucket, self.path, input_file, 
+                                special = arg.special)
+            for o in output:
+                self.poutput(o)
+
+     
+    def complete_p5list(self, text, line, start_index, end_index):
+        """ Used for tab completing p5list """
+        
+        #handle misuse of tab completion gracefully
+        if text =='*':
+            raise ValueError('Cannot tab complete wildcards')
+        
+        prefix = self.__handle_path(text)
+        myobjs = [o.object_name for o in self.client.list_objects(self.bucket,prefix=prefix) if not o.is_dir]
+        if text:
+            return [
+                adir for adir in myobjs
+                if adir.startswith(text)
+            ]
+        else:
+            return myobjs
+
+
+
     def default(self,arg):
         if not self.starting:
             self.poutput(_err(f'Command not recognised (at alias={self.alias}, bucket={self.bucket}, path={self.path})'))

@@ -1,12 +1,14 @@
 import cmd2
+import logging
 from pathlib import Path
 from s3v.s3core import get_client, get_locations, lswild, desanitise_metadata
-from s3v.skin import _i, _e, _p, _err, fmt_size, fmt_date
+from s3v.skin import _i, _e, _p, _err, fmt_size, fmt_date, ColourFormatter
 from minio.deleteobjects import DeleteObject
 from minio.commonconfig import CopySource
 from minio.tagging import Tags
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
+from io import StringIO
 
 from s3v.drs_view import drs_view, drs_metaview
 import bitmath
@@ -33,17 +35,117 @@ def match_metadata(client, bucket, object_name, matches):
     return True, object_name
 
 
+class OutputHandler:
+    """ 
+    Provides indirection through to cmd2 poutput, but in such a way
+    that methods can keep their output for piping, and responses can
+    be cached.
+
+    This should be called in the init method of a cmd2 instance, something like
+
+        self.output_handler=OutputHandler(self)
+        self.houtput=self.output_handler.write
+
+    which means you can use self.houtput(stuff for output) instead of 
+    self.poutput (the default cmd2 option).
+
+    A future version will include persistence, and cache maintenance.
+    """
+    def __init__(self, cmd_instance):
+        """ 
+        Instantiate in the init method of a cmd2 instance 
+        """
+        self.cmd = cmd_instance
+        self.cache = {}
+        self.lines = []
+        self.signature = None
+        self.last_cache = None
+
+    def write(self,string):
+        """ 
+        this is the output method, writes normal output
+        and grabs a copy for later use in pipe and/or to
+        go to cache 
+        """
+        # send straight to output
+        self.cmd.poutput(string)
+        for line in string.splitlines():
+            self.lines.append(line)
+            self.cmd.log.debug(f'[cache] received {line}')
+
+    def start(self):
+        self.lines = []
+        self.signature = None
+
+    @staticmethod
+    def __make_signature(method_name, arg_namespace):
+        sig_items = []
+        for k, v in vars(arg_namespace).items():
+            # skip cmd2 internal wrapper objects
+            if k.startswith("cmd2_"):
+                continue
+            # convert lists or other mutable types to tuples
+            if isinstance(v, list):
+                v = tuple(v)
+            sig_items.append((k, v))
+        # sort for deterministic ordering
+        sig_items.sort()
+        return (method_name, tuple(sig_items))
+
+    def start_method(self, method_name, arg_namespace):
+        """
+        Call this with at the beginning of a method.
+        If this returns anything but None, you have got
+        something in the cache, and you can decide what
+        you want to do with it.
+        """
+        signature = self.__make_signature(method_name, arg_namespace)
+        self.signature = signature
+        if signature in self.cache:
+            self.cmd.log.debug('[cache] start')
+            self.last_cache = self.cache[signature]
+            return self.last_cache
+        else:
+            self.lines = []
+            return None
+
+    def end_method_and_cache(self):
+        """ 
+        Call this at the end of a method to populate the cache
+        """
+        if self.signature:
+            self.cache[self.signature]=self.lines
+            self.last_cache = self.lines
+            self.cmd.log.debug(f'[cache] population had {len(self.lines)} lines')
+        else:
+            self.cmd.log.debug(f'[cache] not used')
+            self.signature = None
+
+
+
 class s3cmd(cmd2.Cmd):
     """ 
     Provides a view into one or more S3 repositories
     configured with a user's minio mc environment.
-   
     """
+    allow_redirection = True
     def __init__(self, path=None):
 
         # Set include_ipy to True to enable the "ipy" command which runs an interactive IPython shell
         super().__init__(include_ipy=True)
-        
+
+        self.log = logging.getLogger('s3view')
+
+        #controls level (need to set this to get the logger to process anything, 
+        #if this is below the console level, we get nothing).
+        self.log.setLevel(logging.INFO)
+
+        self.console = logging.StreamHandler()
+        # if the log level lets it through, this controls the actual output to console
+        self.console.setLevel(logging.INFO)
+        self.console.setFormatter(ColourFormatter('%(levelname)s: %(message)s'))
+        self.log.addHandler(self.console)
+
         self.poutput(_i('You have entered a lightweight management tool for organising "files" inside an S3 object store'))
         self.prompt = 's3> '
         self.debug = False
@@ -62,6 +164,13 @@ class s3cmd(cmd2.Cmd):
             'alias', 'macro', 'edit', 'run_pyscript', 'run_script',
             'shortcuts', 'shell', 'py', 'history', 'set', 'suspend'
         }
+
+        self.output_handler=OutputHandler(self)
+        self.houtput=self.output_handler.write
+
+        self.pipe_producers = ['ls',]
+        self.pipe_consumers = ['p5list',]
+
 
     def get_names(self):
         # This method returns a list of all command method names
@@ -219,6 +328,77 @@ class s3cmd(cmd2.Cmd):
         mymetadata = sorted(mymetadata, key=lambda x: x[0]['n'])
         return mymetadata
 
+
+    def precmd(self, statement):
+        """
+        Handles internal piping using '::'. Splits the line into LHS and RHS.
+        Executes LHS first (output is cached), then returns RHS to be executed next.
+        """
+        line = statement.raw  # get raw input
+        self.log.debug(f'[precmd] received: {repr(line)}')
+
+        if '::' in line:
+            lhs, rhs = map(str.strip, line.split('::', 1))
+            try:
+                lhs_cmd = lhs.split()[0]
+                rhs_cmd = rhs.split()[0]
+
+                # Ensure only allowed commands participate
+                if lhs_cmd not in self.pipe_producers:
+                    self.poutput(_err(f"{lhs_cmd} cannot produce output for another internal command"))
+                    return ''
+
+                if rhs_cmd not in self.pipe_consumers:
+                    self.poutput(_err(f"{rhs_cmd} does not know how to consume previous output"))
+                    return ''
+
+                # Execute LHS; output should be both cached and suppressed
+                original_stdout = self.stdout        # Save current stdout
+                buffer = StringIO()
+                self.stdout = buffer
+                lhserror = False
+                try:
+                    self.onecmd_plus_hooks(lhs)
+                finally:
+                    self.stdout = original_stdout
+                    for line in buffer.getvalue().splitlines():
+                        if line.startswith('EXCEPTION'):
+                            self.output(line)
+                            lhserror = True
+                if lhserror:
+                    self.__pipe_input = None
+                    self.poutput(_err('Did not proceed to right hand side of pipe'))
+                    return ''
+
+                # Store the last cached output for RHS
+                self.__pipe_input = self.output_handler.last_cache
+                self.log.debug(f'[precmd] stored [[{self.__pipe_input}]]')
+
+                self.log.debug(f"[precmd] Going to {rhs_cmd} with piped input")
+                return rhs  # RHS will now be dispatched by cmd2
+
+            except Exception as e:
+                self.poutput(_err(str(e)))
+                self.__pipe_input = None
+                return ''
+        else:
+            # No pipe, clear any stale input
+            self.__pipe_input = None
+            return line
+
+    def cached_columnize(self, *args, **kwargs):
+        """ intercept columnize and make sure we get output to cache """
+        self.log.debug('intercepting columnize')
+        buf = StringIO()
+        old_stdout = self.stdout
+        self.stdout = buf
+        self.columnize(*args,**kwargs)
+        self.stdout = old_stdout
+        tocache = buf.getvalue().splitlines()
+        self.log.debug(f'[caccol] found {len(tocache)} lines to cache')
+        for line in tocache:
+            self.houtput(line)
+
     def do_lb(self,arg=None):
         """ Navigate around a S3 service"""
         if arg is not None:
@@ -289,6 +469,7 @@ class s3cmd(cmd2.Cmd):
                 result[p]=mymeta[p]
             return result
 
+
         if self.path is None: 
             self.path = '/'
 
@@ -302,14 +483,24 @@ class s3cmd(cmd2.Cmd):
             print(arg.order)
             self.poutput(_err('Unrecognised order option'))
 
+
+        cache_available = self.output_handler.start_method('do_ls', arg)
+        if cache_available:
+            self.poutput(_i('Using cached information'))
+            #FIXME make that optional, use times etc
+            for line in cache_available:
+                self.poutput(line)
+            return
+            
+            
         volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras, limit=limit)
         if limit is None:
-            self.poutput(_i('Location: ') + self.path + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))
+            self.houtput(_i('Location: ') + self.path + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))
             directory = 'directory'
             if extras: directory = "match"
-            self.poutput(_i(f'This {directory} contains ')+ str(len(myfiles)) + _i(' files and ') + str(len(mydirs)) + _i(' directories.'))
+            self.houtput(_i(f'This {directory} contains ')+ str(len(myfiles)) + _i(' files and ') + str(len(mydirs)) + _i(' directories.'))
         else:
-            self.poutput(_i(f'Listing {max(nfiles,limit)} files/objects ('+fmt_size(volume)+')'))
+            self.houtput(_i(f'Listing {max(nfiles,limit)} files/objects ('+fmt_size(volume)+')'))
             
 
         width = arg.width
@@ -356,19 +547,22 @@ class s3cmd(cmd2.Cmd):
                 case 'date':
                     strings = sorted(strings, key=lambda x: x['d'])
             for s in strings:
-                self.poutput(s['s'])
+                self.houtput(s['s'])
                     
         else:
-            self.columnize([f"{Path(f['n']).name}" for f in myfiles],display_width=width)
+            self.log.debug('[ls] b4 columnize')
+            self.cached_columnize([f"{Path(f['n']).name}" for f in myfiles],display_width=width)
+            self.log.debug('[ls] after columnize')
 
         if len(mydirs) > 0: 
             if len(mydirs) > 3:
-                self.poutput(_i('Sub-directories are : '))
-                self.columnize([_e(f'{d[0]}({d[1]})') for d in mydirs],display_width=width)
+                self.houtput(_i('Sub-directories are : '))
+                self.cached_columnize([_e(f'{d[0]}({d[1]})') for d in mydirs],display_width=width)
             else:
-                self.poutput(_i('Sub-directories are : ')+_e('  '.join([f'{d[0]}({d[1]})' for d in mydirs])))
+                self.houtput(_i('Sub-directories are : ')+_e('  '.join([f'{d[0]}({d[1]})' for d in mydirs])))
 
-    
+        self.output_handler.end_method_and_cache()
+
     fi_args = cmd2.Cmd2ArgumentParser()
     fi_args.add_argument('-p', '--path', default=None, help='path prefix in which you want to find the metadata matches')
     fi_args.add_argument('-w', '--width', nargs='?', default=90, type=int, help='width of display for standard output')
@@ -670,20 +864,42 @@ class s3cmd(cmd2.Cmd):
             return myobjs
 
     p5d_args = cmd2.Cmd2ArgumentParser()
-    p5d_args.add_argument('object', nargs=1,help='object should be a valid HDF5 or NC4 file in your current bucket and location.')
+    p5d_args.add_argument('object', nargs='?',help='object should be a valid HDF5 or NC4 file in your current bucket and location.')
     p5d_args.add_argument('-s','--special',action='store_true', help='Display special attributes of datasets in files (NOT IMPLEMENTED)')
     @cmd2.with_argparser(p5d_args)
     def do_p5list(self, arg):
-        """ Use pyfive to approximate a ncdump -h on a remote object """
+        """ 
+        Use pyfive to approximate a ncdump -h on a remote object 
+         Accepts:
+            - normal filename argument
+            - piped filenames from previous command via self.__pipe_input.
+        """
         from s3v.p5inspect import p5view
+
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
             return
         
-        input_files = [arg.object[0],]
+        input_files=[]
+
+        if self.__pipe_input:
+            self.log.debug('[p5list] is piped')
+            # Piped input can be a string or list of strings
+            for line in self.__pipe_input[1:]:
+                if line.split(' ')[0] != '':
+                    input_files.append(line.strip())
+                    
+        elif arg.object:
+            self.log.debug(f'[p5list] is normal')
+            input_files = [arg.object,]
+
+        if not input_files:
+            self.poutput(_err("No filename provided"))
+            return
 
         for input_file in input_files:
-            output = p5view(self.alias,self.bucket, self.path, input_file, 
+            self.log.debug(f'[p5list] using file [{input_file}]')
+            output = p5view(self.alias, self.bucket, self.path, input_file, 
                                 special = arg.special)
             for o in output:
                 self.poutput(o)
@@ -696,6 +912,7 @@ class s3cmd(cmd2.Cmd):
         if text =='*':
             raise ValueError('Cannot tab complete wildcards')
         
+        self.log.debug('[complete_p5list] Completion handler active')
         prefix = self.__handle_path(text)
         myobjs = [o.object_name for o in self.client.list_objects(self.bucket,prefix=prefix) if not o.is_dir]
         if text:
@@ -705,6 +922,28 @@ class s3cmd(cmd2.Cmd):
             ]
         else:
             return myobjs
+
+    def do_loglevel(self, arg):
+        """
+        Change logging level. Usage: loglevel [debug|info|warning|error|critical]
+        """
+        level = arg.strip().lower()
+
+        levels = {
+            'debug': logging.DEBUG,
+            'info': logging.INFO,
+            'warning': logging.WARNING,
+            'error': logging.ERROR,
+            'critical': logging.CRITICAL,
+        }
+
+        if level not in levels:
+            self.poutput(_err("Usage: loglevel [debug|info|warning|error|critical]"))
+            return
+
+        self.log.setLevel(levels[level])
+        self.console.setLevel(levels[level])
+        self.poutput(f"Logging level set to {level.upper()}")
 
 
 

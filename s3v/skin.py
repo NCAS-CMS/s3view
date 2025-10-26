@@ -1,4 +1,5 @@
 from cmd2 import Bg, Fg, ansi
+import logging
 
 def __style(string, col):
     """ Colour a string with a particular style """
@@ -19,6 +20,9 @@ def _p(string, col='magenta'):
 def _err(string,col='red'):
     return __style(string,col)
 
+def _log(string,col='cyan'):
+    return __style(string,col)
+
 def fmt_size(num, suffix="B"):
     """ Take the sizes and humanize them """
     for unit in ("", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"):
@@ -31,3 +35,11 @@ def fmt_date(adate):
     """ Take the reported date and humanize it"""
     return adate.strftime('%Y-%m-%d %H:%M:%S %Z')
     
+
+class ColourFormatter(logging.Formatter):
+    def format(self, record):
+        message = super().format(record)
+        if record.levelno >= logging.ERROR:
+            return _err(message)
+        else:
+            return _log(message)

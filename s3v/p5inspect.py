@@ -28,7 +28,7 @@ def p5view(alias, bucket, path, object, special=False):
     with Capturing() as output:
         if True:
             with fs.open(file_uri) as s3file:
-                p5ncdump(s3file)
+                p5ncdump(s3file, special=True)
         if special:
             output.append('(Note that support for the special option is not yet implemented.)')
     return output

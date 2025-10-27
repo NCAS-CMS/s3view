@@ -169,7 +169,7 @@ class s3cmd(cmd2.Cmd):
         self.houtput=self.output_handler.write
 
         self.pipe_producers = ['ls',]
-        self.pipe_consumers = ['p5list',]
+        self.pipe_consumers = ['p5dump',]
 
 
     def get_names(self):
@@ -867,7 +867,7 @@ class s3cmd(cmd2.Cmd):
     p5d_args.add_argument('object', nargs='?',help='object should be a valid HDF5 or NC4 file in your current bucket and location.')
     p5d_args.add_argument('-s','--special',action='store_true', help='Display special attributes of datasets in files (NOT IMPLEMENTED)')
     @cmd2.with_argparser(p5d_args)
-    def do_p5list(self, arg):
+    def do_p5dump(self, arg):
         """ 
         Use pyfive to approximate a ncdump -h on a remote object 
          Accepts:
@@ -883,14 +883,14 @@ class s3cmd(cmd2.Cmd):
         input_files=[]
 
         if self.__pipe_input:
-            self.log.debug('[p5list] is piped')
+            self.log.debug('[p5dump] is piped')
             # Piped input can be a string or list of strings
             for line in self.__pipe_input[1:]:
                 if line.split(' ')[0] != '':
                     input_files.append(line.strip())
                     
         elif arg.object:
-            self.log.debug(f'[p5list] is normal')
+            self.log.debug(f'[p5dump] is normal')
             input_files = [arg.object,]
 
         if not input_files:
@@ -898,21 +898,21 @@ class s3cmd(cmd2.Cmd):
             return
 
         for input_file in input_files:
-            self.log.debug(f'[p5list] using file [{input_file}]')
+            self.log.debug(f'[p5dump] using file [{input_file}]')
             output = p5view(self.alias, self.bucket, self.path, input_file, 
                                 special = arg.special)
             for o in output:
                 self.poutput(o)
 
      
-    def complete_p5list(self, text, line, start_index, end_index):
-        """ Used for tab completing p5list """
+    def complete_p5dump(self, text, line, start_index, end_index):
+        """ Used for tab completing p5dump """
         
         #handle misuse of tab completion gracefully
         if text =='*':
             raise ValueError('Cannot tab complete wildcards')
         
-        self.log.debug('[complete_p5list] Completion handler active')
+        self.log.debug('[complete_p5dump] Completion handler active')
         prefix = self.__handle_path(text)
         myobjs = [o.object_name for o in self.client.list_objects(self.bucket,prefix=prefix) if not o.is_dir]
         if text:

@@ -78,7 +78,7 @@ def drs_view(myfiles, drs, collapse=''):
         except ValueError:
             skipped.append(f)
 
-    return drs_process(contents, collapsed)
+    return drs_process(contents, collapsed, skipped)
    
 
 def drs_metaview(metadata, selects={}, collapse='[]'):
@@ -102,10 +102,10 @@ def drs_metaview(metadata, selects={}, collapse='[]'):
             if v not in contents[k]:
                 contents[k].append(v)
 
-    return drs_process(contents, collapsed)
+    return drs_process(contents, collapsed, skipped)
 
 
-def drs_process(contents, collapsed):
+def drs_process(contents, collapsed, skipped):
     results = {}
     for k in contents:
         if k in collapsed and len(contents[k]) > 2:
@@ -113,14 +113,44 @@ def drs_process(contents, collapsed):
             results[k] = f'[{content[0]} ... {content[-1]}] (len={len(content)})'
         else: 
             results[k] = sorted(contents[k])
-    return drs_pretty(results)
+    return drs_pretty(results, skipped)
             
 
-def drs_pretty(processed_drs):
+def drs_pretty(processed_drs, skipped):
     with Capturing() as output:
-       for k,v in processed_drs.items():
+        for k,v in processed_drs.items():
             print(f'{_i(k)} : {_e(v)}')
+        if skipped: 
+            print(_e('Skipped the following files (no DRS match):'))
+            for f in skipped:
+                print(f)
     return output
+
+def drs_select(files, selections, drs):
+    """ Process files for DRS matches to selection """
+    results, skipped = [], []
+    drsc = drs.split(',')
+    for f in files:
+        try:
+            parsed = parse_filename_to_drs_components(f, drsc)
+            if all(parsed.get(k) == v for k,v in selections.items()):
+                results.append(f)
+        except ValueError as e:
+            skipped.append(f)
+    with Capturing() as output:
+        for k in results:
+            print(k)
+        if skipped: 
+            print(_e('Skipped the following files (no DRS match):'))
+            for f in skipped:
+                print(f)
+    return output
+    
+
+
+                
+            
+        
 
     
     

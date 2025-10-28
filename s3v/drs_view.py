@@ -1,12 +1,16 @@
 from s3v.skin import _i, _e
+from s3v.s3core import Capturing
 
 def __get_collapsed(collapse, drs=None):
-    """ Go from user string to usable list"""
+    """ 
+    Go from user string to usable list. 
+    Expecting a commma seperated string with each element in the DRS (if there is one)
+    """
     collapsed = []
 
-    if collapse != '[]':
+    if collapse != '':
         try:
-            collapsed = collapse[1:-1].split(',')
+            collapsed = collapse.split(',')
         except:
             raise ValueError(f'Collapse option - {collapsed} - is not a python list in a string!')
         
@@ -17,20 +21,47 @@ def __get_collapsed(collapse, drs=None):
         
     return collapsed
 
-def drs_view(myfiles, drs, collapse='[]'):
+
+def parse_filename_to_drs_components(filename, drs=None) -> dict:
+    """
+    Return dictionary of filenanme components or raise a ValueError
+    if the filename doesn't match the DRS.
+
+    If DRS is none, then simply return an enumeration
+    of parts as a dictionary.
+
+    """
+    parts = filename.split('.')[0].split('_')
+    if drs is None:
+        return {i:p for i,p in enumerate(parts)}
+    else:
+        if len(parts) != len(drs):
+            raise ValueError('Filename does not match DRS')
+        else:
+            return {k:p for k,p in zip(drs,parts)}
+
+
+
+def drs_view(myfiles, drs, collapse=''):
     """ 
-    Provide a lightweight view of the contents of a directory using a 
-    provided DRS. Lists DRS contents of files which match the pattern, and
+    Provide a lightweight view of the contents of a directory.
+    
+    The input is a list of filenames, and a list which outlines the 
+    structure which the filenames are expect to use. The filename
+    should map onto that structure with each component separated
+    by an underscore ("_"). 
+    
+    Lists DRS contents of files which match the pattern, and
     then lists any others.
 
-    Currently uses normal print, in case we want to introduce some sort of 
-    ordered tree structure.
+    Output is captured and returned.
     """
 
     try:
-        drs = drs[1:-1].split(',')
+        drs = drs.split(',')
     except:
-        raise ValueError(f'DRS provided - {drs} - is not a python list in a string!')
+        raise ValueError(f'DRS provided - {drs} - is not a comma seperated string!')
+
     contents = {k:[] for k in drs}
     content_length = {k:0 for k in drs}
     skipped = []
@@ -38,31 +69,28 @@ def drs_view(myfiles, drs, collapse='[]'):
     collapsed = __get_collapsed(collapse, drs)
 
     for f in myfiles:
-        parts = f.split('.')[0].split('_')  
-        if len(parts) == len(drs):
-            for k,p in zip(drs,parts):
+        try:
+            parsed = parse_filename_to_drs_components(f,drs)
+            for k,p in parsed.items():
                 if p not in contents[k]:
                     contents[k].append(p)
                     content_length[k]+=1
-        else:
+        except ValueError:
             skipped.append(f)
-   
-    for k in contents:
-        if k in collapsed and len(contents[k]) > 2:
-            content = sorted(contents[k])
-            print(_i(k),':',_e(f'[{content[0]} ... {content[-1]}] (len={len(content)})'))
-        else: 
-            print(_i(k),':',_e(sorted(contents[k])))
+
+    return drs_process(contents, collapsed)
    
 
-    if len(skipped) > 0:
-        print('')
-        print("The following files did not match the drs structure")
-        for f in skipped:
-            print(_e(f))
+def drs_metaview(metadata, selects={}, collapse='[]'):
+    """
+    Provide a drs-like view of the metadata associated with files.
+    This version is assumes the input metadata is a set of
+    (filename, metadata_dictionary) pairs and that the 
+    metadtaa are key-value pairs.
 
-def drs_metaview(metadata, collapse='[]'):
-    """Provide a drs-like view of the metadata associated with files"""
+    It extracts all the unique values for each key, and presents a 
+    list of the values.
+    """
 
     collapsed = __get_collapsed(collapse)
 
@@ -74,23 +102,27 @@ def drs_metaview(metadata, collapse='[]'):
             if v not in contents[k]:
                 contents[k].append(v)
 
+    return drs_process(contents, collapsed)
+
+
+def drs_process(contents, collapsed):
+    results = {}
     for k in contents:
         if k in collapsed and len(contents[k]) > 2:
             content = sorted(contents[k])
-            print(_i(k),':',_e(f'[{content[0]} ... {content[-1]}] (len={len(content)})'))
+            results[k] = f'[{content[0]} ... {content[-1]}] (len={len(content)})'
         else: 
-            print(_i(k),':',_e(sorted(contents[k])))
+            results[k] = sorted(contents[k])
+    return drs_pretty(results)
+            
+
+def drs_pretty(processed_drs):
+    with Capturing() as output:
+       for k,v in processed_drs.items():
+            print(f'{_i(k)} : {_e(v)}')
+    return output
+
     
     
 
-if __name__=="__main__":
-
-    data = [
-        'wa_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1995-12-01T0600_N120.nc',
-        'zg500_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1995-09-01T0600_N120.nc',
-        'zg500_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1996-01-01T0600_N120.nc'
-    ]
-    drs = '[Variable,Source,Experiment,Variant,Frequency,Period,nField]'
-
-    drs_view(data, drs, collapse='[Period]')
 

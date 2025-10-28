@@ -9,6 +9,7 @@ from minio.tagging import Tags
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
 from io import StringIO
+import argparse
 
 from s3v.drs_view import drs_view, drs_metaview
 import bitmath
@@ -33,6 +34,20 @@ def match_metadata(client, bucket, object_name, matches):
             if meta[k]!=v:
                 return False, object_name  
     return True, object_name
+
+def key_value(s: str):
+    """ 
+    Parse a key-=value string into a tuple (key, value).
+    Raises argparse.ArgumentTypeError if format is invalid.
+    """
+    parts = s.split('=')
+    if len(parts) !=2:
+        raise argparse.ArgumentTypeError(f"Expected key=value format, got '{s}'")
+    key, value = parts
+    key, value = key.strip(),value.strip()
+    if not key or not value:
+        raise argparse.ArgumentTypeError(f"Neither key nor value can be empty in '{s}'")
+    return key, value
 
 
 class OutputHandler:
@@ -790,15 +805,19 @@ class s3cmd(cmd2.Cmd):
     
 
     drs_args = cmd2.Cmd2ArgumentParser()
-    drs_args.add_argument('path', nargs='?',help='Path should be a valid path in your current bucket and location, possibly with a wildcard.')
+    drs_args.add_argument('path', nargs='?',
+                            help='Path should be a valid path in your current bucket and location, possibly with a wildcard.')
     drs_args.add_argument('drs', nargs='?', 
-                          default='[Variable,Source,Experiment,Variant,Frequency,Period,nFields]',
-                          help='Python list of DRS components to be used for contents (ignored for metadata option)')
-    drs_args.add_argument('-s','--short',default='[]',help='Python list of DRS terms where short lists are wanted')
+                            default='Variable,Source,Experiment,Variant,Frequency,Period,nFields',
+                            help='Comma seperated string of DRS components to be used for contents (ignored for metadata option)')
+    drs_args.add_argument('-c','--collapse_list',default='',
+                            help='Comma seperated string of DRS terms where short lists are wanted')
     drs_args.add_argument('-u','--use_metadata',action='store_true',help="build drs-like view from metadata")
+    drs_args.add_argument('-s','--select', type=key_value, action='append',
+                            help='Specfiy DRS component selections as key=value (multipe -s allowed) and return listing')
     @cmd2.with_argparser(drs_args)
     def do_drsview(self,arg):
-        """ Extract DRS components at location """
+        """ Extract DRS components at location """  
 
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
@@ -809,12 +828,16 @@ class s3cmd(cmd2.Cmd):
         extras = arg.path
         volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras)
 
+        selects = dict(arg.select) if arg.select else {}
+
         if arg.use_metadata:
             mymetadata = self._getmetadata(myfiles)
-            drs_metaview(mymetadata, collapse=arg.short)
+            output = drs_metaview(mymetadata, selects=selects, collapse=arg.short)
         else:
             myfiles = [f['n'] for f in myfiles]
-            drs_view(myfiles, arg.drs, collapse=arg.short)
+            output = drs_view(myfiles, arg.drs, selects=selects, collapse=arg.short)
+        for line in output:
+            self.houtput(line)
             
         
     cfd_args = cmd2.Cmd2ArgumentParser()

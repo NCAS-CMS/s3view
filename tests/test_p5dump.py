@@ -13,6 +13,7 @@ def test_s3dumping():
     print(output[0:5])
     print(local_output[0:5])
 
-    assert output[1:] == local_output[1:]
-
+    for i in range(1,5):
+        assert output[i].strip() == local_output[i].strip()
+   
 

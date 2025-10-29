@@ -11,7 +11,7 @@ import itertools
 from io import StringIO
 import argparse
 
-from s3v.drs_view import drs_view, drs_metaview
+from s3v.drs_view import drs_view, drs_metaview, drs_select
 import bitmath
 import sys
 
@@ -225,8 +225,12 @@ class s3cmd(cmd2.Cmd):
             try:
                 self.client = get_client(self.alias)
             except ValueError as e:
+                #FIXME: the error handling for choosing a non-existent bucket is borked
                 self.poutput(_err(e))
-                sys.exit(1)
+                self.prompt = 's3> '
+                self.bucket = self.alias
+                self.path = None
+                return
 
             try:
                 self.buckets = [b.name for b in self.client.list_buckets()]
@@ -804,17 +808,21 @@ class s3cmd(cmd2.Cmd):
 
     
 
+    drs_default = 'Variable,Source,Experiment,Variant,Frequency,Period,nFields'
     drs_args = cmd2.Cmd2ArgumentParser()
     drs_args.add_argument('path', nargs='?',
                             help='Path should be a valid path in your current bucket and location, possibly with a wildcard.')
     drs_args.add_argument('drs', nargs='?', 
-                            default='Variable,Source,Experiment,Variant,Frequency,Period,nFields',
-                            help='Comma seperated string of DRS components to be used for contents (ignored for metadata option)')
+                            default=drs_default,
+                            help=('Comma seperated string of DRS components to be used for contents '
+                            '(ignored for metadata option)\n'
+                            f'default = {drs_default}'))
     drs_args.add_argument('-c','--collapse_list',default='',
                             help='Comma seperated string of DRS terms where short lists are wanted')
     drs_args.add_argument('-u','--use_metadata',action='store_true',help="build drs-like view from metadata")
     drs_args.add_argument('-s','--select', type=key_value, action='append',
                             help='Specfiy DRS component selections as key=value (multipe -s allowed) and return listing')
+    drs_args.add_argument('-o','--output',default='drs',nargs=1,help='Default output is a DRS view, alternative is "list" view.')
     @cmd2.with_argparser(drs_args)
     def do_drsview(self,arg):
         """ Extract DRS components at location """  
@@ -825,17 +833,43 @@ class s3cmd(cmd2.Cmd):
 
         if self.path is None:
             self.path = '/'
+
         extras = arg.path
         volume, nfiles, ndirs, mydirs, myfiles = self._recurse(self.path, extras)
 
         selects = dict(arg.select) if arg.select else {}
 
+        if selects:
+            myfiles,skipped = drs_select(myfiles, selects, arg.drs)
+
+        if arg.output:
+            output_arg = arg.output[0]
+        else:
+            output_arg='drs'
+
+        if output_arg == 'list':
+            if not arg.select:
+                self.poutput(_e('List output only available with selection'))
+                return
+            for f in myfiles:
+                self.poutput(f['n'])
+            if skipped: 
+                self.poutput(_e('Skipped the following files (no DRS match):'))
+                for f in skipped:
+                    self.poutput(f)
+            return
+        elif output_arg != 'drs':
+            self.poutput(_e(f'output options are "drs" or "list" (you said "{arg.output}")'))
+
+         
+        #FIXME: move metadata select out of here, it doesn't work with drs_select for now.
         if arg.use_metadata:
             mymetadata = self._getmetadata(myfiles)
-            output = drs_metaview(mymetadata, selects=selects, collapse=arg.short)
+            output = drs_metaview(mymetadata, selects=selects, collapse=arg.collapse_list)
         else:
             myfiles = [f['n'] for f in myfiles]
-            output = drs_view(myfiles, arg.drs, selects=selects, collapse=arg.short)
+            output = drs_view(myfiles, arg.drs, selects=selects, collapse=arg.collapse_list)
+
         for line in output:
             self.houtput(line)
             

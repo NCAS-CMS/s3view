@@ -42,7 +42,7 @@ def parse_filename_to_drs_components(filename, drs=None) -> dict:
 
 
 
-def drs_view(myfiles, drs, collapse=''):
+def drs_view(myfiles, drs, selects={}, collapse=''):
     """ 
     Provide a lightweight view of the contents of a directory.
     
@@ -132,19 +132,12 @@ def drs_select(files, selections, drs):
     drsc = drs.split(',')
     for f in files:
         try:
-            parsed = parse_filename_to_drs_components(f, drsc)
+            parsed = parse_filename_to_drs_components(f['n'], drsc)
             if all(parsed.get(k) == v for k,v in selections.items()):
                 results.append(f)
         except ValueError as e:
             skipped.append(f)
-    with Capturing() as output:
-        for k in results:
-            print(k)
-        if skipped: 
-            print(_e('Skipped the following files (no DRS match):'))
-            for f in skipped:
-                print(f)
-    return output
+    return results, skipped
     
 
 

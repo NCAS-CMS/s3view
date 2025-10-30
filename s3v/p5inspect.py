@@ -32,19 +32,3 @@ def p5view(alias, bucket, path, object, special=False):
         if special:
             output.append('(Note that support for the special option is not yet implemented.)')
     return output
-
-def test_s3():
-    alias = 'hpos'
-    bucket ='bnl'
-    path = ''
-    object = 'common_cl_a.nc'
-    return p5view(alias, bucket, path, object)
-    
-
-   
-
-if __name__=="__main__":
-  
-    output = test_s3()
-    for line in output:
-        print(line)

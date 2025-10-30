@@ -4,9 +4,9 @@ import re
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 DATA = [
-        'wa_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1995-12-01T0600_N120.nc',
-        'zg500_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1995-09-01T0600_N120.nc',
-        'zg500_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1996-01-01T0600_N120.nc'
+        {'n':'wa_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1995-12-01T0600_N120.nc'},
+        {'n':'zg500_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1995-09-01T0600_N120.nc'},
+        {'n':'zg500_HadGA7EA-N1280_highresSST-present_r1i1p1f1_6hrPt_1996-01-01T0600_N120.nc'}
     ]
 
 DRS = 'Variable,Source,Experiment,Variant,Frequency,Period,nField'
@@ -37,7 +37,8 @@ def helper(lines):
 
 def test_drsview():
 
-    output = drs_view(DATA, DRS, collapse='Period')
+    data = [f['n'] for f in DATA]
+    output = drs_view(data, DRS, collapse='Period')
     
     print()
     for line in output:
@@ -50,6 +51,6 @@ def test_drsview():
 def test_drs_select():
 
     selections = {'Variable':'wa'}
-    output = drs_select(DATA, selections, DRS)
+    output,skipped = drs_select(DATA, selections, DRS)
     assert len(output) == 1
     assert output[0] == DATA[0]

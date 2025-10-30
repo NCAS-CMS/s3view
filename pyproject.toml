@@ -32,6 +32,7 @@ dependencies = [
     'minio',
     'bitmath',
     'cf-python',
+    'udunits2',
     'pyfive @ git+https://github.com/ncas-cms/pyfive.git@optimise',
     'fsspec'
 ]
@@ -47,6 +48,7 @@ s3view = "s3v.s3view:main"
 test = [
    'pytest',
    'pytest-mock',
+   'docker'
 ]
 dev = [
     'pytest',

@@ -2,6 +2,7 @@ from s3v.cftools import CFSplitter
 import logging
 import os
 import cf
+from pathlib import Path
 
 def test_cfsplitter(sample_netcdf, tmp_path, caplog):
 
@@ -11,14 +12,19 @@ def test_cfsplitter(sample_netcdf, tmp_path, caplog):
 
     caplog.set_level(logging.DEBUG)
 
-    cfs = CFSplitter(output_folder=tmp_path)
+    output_dir = tmp_path
+    cfs = CFSplitter(output_folder=output_dir)
 
     cfs.split_one(sample_netcdf)
 
-    files = os.listdir(tmp_path)
-    ss = ''
+    files = list(Path(output_dir).glob('*.nc'))
+    assert len(files) == 3
     for f in files:
         flds = cf.read(f)
         print(flds)
-    print(ss)
+        if not f.stem.startswith('test'):
+            if f.stem.startswith('press'):
+                assert flds[0].standard_name=='air_pressure'
+            assert flds[0].nc_dataset_chunksizes()==(4,362,362)
+            
 

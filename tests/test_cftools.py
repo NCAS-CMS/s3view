@@ -1,11 +1,11 @@
-from s3v.cftools import CFSplitter
+from s3v.cftools import CFSplitter, MetaFix, FileNameFix
 import logging
 import os
 import cf
 from pathlib import Path
 import json
 
-def test_cfsplitter_nc(sample_netcdf, tmp_path, caplog):
+def test_cfsplitter_simple(sample_netcdf, tmp_path, caplog):
 
     # for reasons none of me, Claude, or ChatGPT understand, no 
     # amount of mucking around in pytest.ini, or fixtuers, makes this 
@@ -36,74 +36,52 @@ def test_cfsplitter_nc(sample_netcdf, tmp_path, caplog):
         for key in fset:
             assert flds[0].properties()[key] == metadata[key]
 
-            
-def NOtest_cfsplitter_use_b(sample_netcdf, tmp_path, caplog):
+
+def test_cfsplitter_fix_metadata(sample_netcdf, tmp_path, caplog):
     caplog.set_level(logging.DEBUG)
+
+    # add something and fix something
+    # external_metadata takes priority over internal metadata unless it is None, in which
+    # case we expect to get it from the file 
+    external_metadata = {'project':'pytest','experiment':'dummy2','standard_name':None}
 
     output_dir = tmp_path
-    cfs = CFSplitter(output_folder=output_dir, use_internal_bmetadata=True)
+    metafix = MetaFix(external_metadata)
+    cfs = CFSplitter(meta_handler=metafix, output_folder=output_dir)
 
-    cfs.split_one(sample_netcdf)
+    filebases = cfs.split_one(sample_netcdf)
 
-    files = list(Path(output_dir).glob('*.nc'))
-    assert len(files) == 3
-    json_files = list(Path(output_dir).glob('*.json'))
-    assert len(json_files) == 2
-    for ff in json_files:
-        with open(ff,'r') as f:
-            metadata = json.load(f)
-        if str(ff.stem).startswith('temp'):
-            assert metadata['standard_name'] == 'air_temperature'
-        assert metadata['experiment'] == 'dummy'
+    assert len(filebases) == 2
 
-def NOtest_cfsplitter_use_drs(sample_netcdf, tmp_path, caplog):
-    caplog.set_level(logging.DEBUG)
-
-    DRS = ['experiment','institute','standard_name','freq']
-
-
-    def drs_eg(f):
-        return {'experiment':f[1],'institute':f[2]}
+    for f in filebases:
+        ncf = f.with_suffix('.nc')
+        jf = f.with_suffix('.json')
+        flds = cf.read(ncf)
+        print(flds)
+        with open(jf,'r') as ojf:
+            metadata = json.load(ojf)
+        assert 'myattribute' not in metadata.keys()
+        assert metadata['standard_name'] == flds[0].standard_name
+        properties = flds[0].properties()
+        assert metadata['experiment'] == 'dummy2'
+        assert properties['experiment'] == 'dummy2'
+        assert properties['project'] == 'pytest'
     
-    def make_name_eg(f,fld):
-        drs = drs_eg(f)
-        ncv = fld.nc_get_variable()
-        return f"{ncv}_{drs['experiment']}_{drs['institute']}"
 
-    # make sure our test data name is what we think it is
-    check_drs_first = drs_eg(sample_netcdf)
-    assert check_drs_first['experiment'] == 'dummy'
-    assert check_drs_first['institute'] == 'cslewis' 
+def test_cfsplitter_filenames(sample_netcdf, tmp_path, caplog):
+
+
+    DRS = ['!ncname','experiment','institute','!freq']
+    filename_map = ['ignore','experiment','institute','ignore']
+    namefix = FileNameFix(DRS, filename_map)
 
     # now we can do the actual test
     output_dir = tmp_path
-    cfs = CFSplitter(output_folder=output_dir, 
-                    use_internal_bmetadata=False,
-                    name_generator=make_name_eg,
-                    external_metadata=DRS
-                    )
+    cfs = CFSplitter(filename_handler=namefix, output_folder=output_dir)
 
-    cfs.split_one(sample_netcdf)
+    results = cfs.split_one(sample_netcdf)
 
     files = list(Path(output_dir).glob('*.nc'))
     assert len(files) == 3
     
-    temp = 'temp_dummy_narnia.nc'
-    press = 'press_dummy_narnia.nc'
-    assert temp in [f.name for f in files]
-    assert press in [f.name for f in files]
-
-    check_file = output_dir/temp
-    fld = cf.read(check_file)[0]
-    properties = fld.properties()
-    assert properties['experiment'] == 'cslewis' # not narnia, should have changed
-    assert properties['myattribute'] == 'value' # still there
-
-    json_files = list(Path(output_dir).glob('*.json'))
-    assert len(json_files) == 2
-    for ff in json_files:
-        with open(ff,'r') as f:
-            metadata = json.load(f)
-        if str(ff.stem).startswith('temp'):
-            assert metadata['standard_name'] == 'air_temperature'
-        assert metadata['experiment'] == 'dummy'
+    print(files)

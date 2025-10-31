@@ -8,6 +8,8 @@ import tempfile
 from minio import Minio
 from requests.exceptions import ConnectionError
 import subprocess
+from .utils.make_test_data import make_test_netcdf_with_coords
+import logging
 
 MINIO_IMAGE = "quay.io/minio/minio:latest"
 ACCESS_KEY = "minioadmin"
@@ -28,6 +30,12 @@ def _cleanup_old_minio():
             subprocess.run(["docker", "rm", "-f"] + ids, check=False)
     except Exception as e:
         print(f"Warning: cleanup failed: {e}")
+
+@pytest.fixture(autouse=True)
+def silence_noisy_loggers():
+    """Silence chatty third-party loggers"""
+    logging.getLogger('cfdm').setLevel(logging.WARNING)
+    logging.getLogger('cfdm.read_write.netcdf.netcdfwrite').setLevel(logging.WARNING)
 
 @pytest.fixture(scope="session")
 def minio_service():
@@ -114,3 +122,7 @@ def fake_mc_config(monkeypatch):
     monkeypatch.setenv("HOME", tmpdir)
 
     yield new_path
+
+@pytest.fixture
+def sample_netcdf(tmp_path):
+    return make_test_netcdf_with_coords(tmp_path)

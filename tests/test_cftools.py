@@ -1,5 +1,6 @@
 from s3v.cftools import CFSplitter
 import logging
+import os
 import cf
 
 def test_cfsplitter(sample_netcdf, tmp_path, caplog):
@@ -15,5 +16,9 @@ def test_cfsplitter(sample_netcdf, tmp_path, caplog):
     cfs.split_one(sample_netcdf)
 
     files = os.listdir(tmp_path)
-    print(files)
+    ss = ''
+    for f in files:
+        flds = cf.read(f)
+        print(flds)
+    print(ss)
 

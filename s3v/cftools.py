@@ -54,14 +54,17 @@ class CFSplitter:
             field.data.nc_set_dataset_chunksizes(chunk_shape)
             
             output_filename = self._generate_filename(filename, field)
+            output_filename = Path(self.output_folder)/output_filename
             
-            self.logger.debug(f'Writing {ith+1}/{nfiles} file: {output_filename}')
-            cf.write([field,],output_filename+'.nc')
-            self.logger.debug(f'Written {output_filename}')
+            ncout = output_filename.with_suffix('.nc')
+            jfout = output_filename.with_suffix('.json')
+            self.logger.debug(f'Writing {ith+1}/{nfiles} file: {ncout}')
+            cf.write([field,],ncout)
+            self.logger.debug(f'Written {ncout}')
             
-            if with_json:
-                json.dump(metadata, output_filename+'.json', ensure_ascii=False, indent=4)
-            stem.append(output_filename)
+            if with_json and metadata:
+                json.dump(metadata, jfout, ensure_ascii=False, indent=4)
+            stems.append(output_filename)
         
         return stems
 
@@ -90,12 +93,13 @@ class CFSplitter:
         """ 
         Provides the simplest possible name for the output file. 
         """
+        #FIXME, only using the name for now, really want path but need to check pytest permissions
         if self.nfiles > 1:
             ncname = field.nc_get_variable()
             
-            return f'{ncname}_{filename.name}-split'
+            return f"{ncname}_{filename.stem}-split"
         else:
-            return f'{filename.name}-split'
+            return f"{filename.stem}-split"
 
 
 class CFuploader (CFSplitter):

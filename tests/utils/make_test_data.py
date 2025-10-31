@@ -5,7 +5,7 @@ from pathlib import Path
 
 def make_test_netcdf_with_coords(tmp_path: Path = Path("/tmp")) -> Path:
     """Create a CF-compliant NetCDF file where each lat/lon slice ≈ 1 MB."""
-    ncfile = tmp_path / "test_fields_coords_big.nc"
+    ncfile = tmp_path / "test_dummy_cslewis_ignore-this-stuff.nc"
 
     n_time = 12
     n_lat = 362

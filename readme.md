@@ -55,7 +55,7 @@ Mine look like:
             "url": "http://hiresgw-o.jc.rl.ac.uk",
 			"accessKey": "Stuff",
 			"secretKey": "Longer \" Stuff",
-			"api": "Cfs34",
+			"api": "S3v4",
       	    "path": "auto"    
 		},
 ```
@@ -65,7 +65,7 @@ and elsewhere:
             "url": "https://hiresgw-o.s3-ext.jc.rl.ac.uk",
 			"accessKey": "Stuff",
 			"secretKey": "Longer \" Stuff",
-			"api": "Cfs34",
+			"api": "S3v4",
       	    "path": "auto"    
 		},
 ```

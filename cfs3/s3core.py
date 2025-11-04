@@ -13,7 +13,7 @@ def get_locations(config_file='.mc/config.json'):
     with open(config,'r') as jfile:
         jdata = json.load(jfile)
     jd = jdata['aliases']
-    locations = {x:jd[x] for x in jd if jd[x]['api']=='S3v4'}
+    locations = {x:jd[x] for x in jd if jd[x]['api']=='Cfs34'}
     return locations
 
 

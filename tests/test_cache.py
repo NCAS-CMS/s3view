@@ -1,7 +1,7 @@
 import pytest
 import time
 from unittest.mock import MagicMock
-from s3v.s3cache import PersistentCachedMinio, CacheMode, CachedObject
+from cfs3.s3cache import PersistentCachedMinio, CacheMode, CachedObject
 
 @pytest.fixture
 def mock_minio():

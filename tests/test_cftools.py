@@ -1,4 +1,4 @@
-from s3v.cftools import CFSplitter, MetaFix, FileNameFix
+from cfs3.cftools import CFSplitter, MetaFix, FileNameFix
 import logging
 import os
 import cf

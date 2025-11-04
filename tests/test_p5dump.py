@@ -1,7 +1,7 @@
-from s3v.p5inspect import p5view
-from s3v.s3core import Capturing
+from cfs3.p5inspect import p5view
+from cfs3.s3core import Capturing
 from pyfive.inspect import p5ncdump
-from s3v.s3up import Uploader
+from cfs3.s3up import Uploader
 from pathlib import Path
 
 def test_remote_p5dump(fake_mc_config, temp_bucket):

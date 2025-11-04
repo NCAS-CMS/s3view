@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 # -*-python-*-
 
-from s3v.s3cmd import s3cmd
+from cfs3.s3cmd import s3cmd
 import sys
 
 def main(argv=None):

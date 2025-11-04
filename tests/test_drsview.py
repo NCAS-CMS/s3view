@@ -1,4 +1,4 @@
-from s3v.drs_view import drs_view, drs_pretty, drs_select
+from cfs3.drs_view import drs_view, drs_pretty, drs_select
 import re
 
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')

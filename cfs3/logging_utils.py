@@ -11,7 +11,7 @@ def get_logger(name: str = None, level: int = logging.DEBUG) -> logging.Logger:
     - Under pytest, logs are captured by pytest; no handlers are added or removed.
     - Always propagates so higher-level frameworks can capture messages.
     """
-    logger = logging.getLogger(name or "s3v")
+    logger = logging.getLogger(name or "cfs3")
     logger.setLevel(level)
 
     # Detect pytest environment

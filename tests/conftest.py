@@ -103,7 +103,7 @@ def fake_mc_config(monkeypatch):
                 "url": "http://localhost:9000",
                 "accessKey": "minioadmin",
                 "secretKey": "minioadmin",
-                "api": "S3v4",
+                "api": "Cfs34",
                 "lookup": "auto"
             }
         }

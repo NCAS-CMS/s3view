@@ -1,8 +1,15 @@
-# S3view
+# cfs3
 
-Lightweight tool for navigating around an S3 repository, utilising minio tools (hence, to use it, you need to set up a minio configuration file (`config.json`) in your `~./mc` directory. See below.)
+Package of tools for manipulating data held in S3 which can make use of the CF compliant metadata in the files,  and use, if it exists extra information conforming to
+a user defined  "Data Reference Syntax" (DRS) which covers some structured requirements for data and file attributes and filenames.
 
 For now, you need to git clone it, and install from the cloned repository using `pip install --use-pep517 -e .`
+
+You will almost certainly need to configure your access details using a minio configuration file as described below.
+
+## s3view
+
+Lightweight tool for navigating around an S3 repository, utilising minio tools (hence, to use it, you need to set up a minio configuration file (`config.json`) in your `~./mc` directory. See below.)
 
 To run it, simply run the script `s3view`, and there is help within that.
 
@@ -16,11 +23,11 @@ Note that unlike other packages, we treat each bucket as it's own independent fi
 
 Yes we know there are easier ways to do most of this (the minio command line tools for example), but this package does different things by default, and we want to be able to use elements of it in other code. We may well extend it to be a bit more "climate data aware" as well. Early days.
 
-## Testing and Reliability
+### Testing and Reliability
 
 The unittest framework is not yet ready, so it's very much caveat emptor for now. 
 
-## JASMIN Access
+### JASMIN Access
 
 For those of you using this on JASMIN, the procedure to get going on the object store is
 
@@ -48,7 +55,7 @@ Mine look like:
             "url": "http://hiresgw-o.jc.rl.ac.uk",
 			"accessKey": "Stuff",
 			"secretKey": "Longer \" Stuff",
-			"api": "S3v4",
+			"api": "Cfs34",
       	    "path": "auto"    
 		},
 ```
@@ -58,7 +65,7 @@ and elsewhere:
             "url": "https://hiresgw-o.s3-ext.jc.rl.ac.uk",
 			"accessKey": "Stuff",
 			"secretKey": "Longer \" Stuff",
-			"api": "S3v4",
+			"api": "Cfs34",
       	    "path": "auto"    
 		},
 ```

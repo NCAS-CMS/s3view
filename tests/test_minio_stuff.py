@@ -5,8 +5,8 @@ import tempfile
 import pytest
 from minio.error import S3Error
 
-from s3v import s3core
-from s3v.s3up import Uploader
+from cfs3 import s3core
+from cfs3.s3up import Uploader
 
 
 def test_get_client_and_basic_ops(fake_mc_config, minio_service, temp_bucket):
@@ -63,7 +63,7 @@ def test_error_handling_invalid_alias(monkeypatch):
     monkeypatch.setattr(
         s3core,
         "get_locations",
-        lambda cfg: {"known": {"api": "S3v4"}}
+        lambda cfg: {"known": {"api": "Cfs34"}}
     )
 
     with pytest.raises(ValueError):

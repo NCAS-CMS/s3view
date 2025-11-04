@@ -1,5 +1,5 @@
 from pyfive.inspect import p5ncdump
-from s3v.s3core import get_user_config, Capturing
+from cfs3.s3core import get_user_config, Capturing
 import s3fs
 from pathlib import Path
 

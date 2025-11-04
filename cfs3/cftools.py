@@ -1,7 +1,7 @@
 import cf 
-from s3v.s3up import Uploader
-from s3v.cfchunking import get_optimal_chunkshape
-from s3v.logging_utils import get_logger
+from cfs3.s3up import Uploader
+from cfs3.cfchunking import get_optimal_chunkshape
+from cfs3.logging_utils import get_logger
 import logging
 import os
 from pathlib import Path

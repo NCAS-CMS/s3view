@@ -1,5 +1,5 @@
-from s3v.skin import _i, _e
-from s3v.s3core import Capturing
+from cfs3.skin import _i, _e
+from cfs3.s3core import Capturing
 
 def __get_collapsed(collapse, drs=None):
     """ 

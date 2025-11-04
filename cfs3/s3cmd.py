@@ -1,8 +1,8 @@
 import cmd2
 import logging
 from pathlib import Path
-from s3v.s3core import get_client, get_locations, lswild, desanitise_metadata
-from s3v.skin import _i, _e, _p, _err, fmt_size, fmt_date, ColourFormatter
+from cfs3.s3core import get_client, get_locations, lswild, desanitise_metadata
+from cfs3.skin import _i, _e, _p, _err, fmt_size, fmt_date, ColourFormatter
 from minio.deleteobjects import DeleteObject
 from minio.commonconfig import CopySource
 from minio.tagging import Tags
@@ -11,7 +11,7 @@ import itertools
 from io import StringIO
 import argparse
 
-from s3v.drs_view import drs_view, drs_metaview, drs_select
+from cfs3.drs_view import drs_view, drs_metaview, drs_select
 import bitmath
 import sys
 
@@ -149,7 +149,7 @@ class s3cmd(cmd2.Cmd):
         # Set include_ipy to True to enable the "ipy" command which runs an interactive IPython shell
         super().__init__(include_ipy=True)
 
-        self.log = logging.getLogger('s3view')
+        self.log = logging.getLogger('cfs3iew')
 
         #controls level (need to set this to get the logger to process anything, 
         #if this is below the console level, we get nothing).
@@ -881,7 +881,7 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(cfd_args)
     def do_cflist(self, arg):
         """ cflist a remote object """
-        from s3v.s3sci import cfread
+        from cfs3.s3sci import cfread
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
             return
@@ -931,7 +931,7 @@ class s3cmd(cmd2.Cmd):
             - normal filename argument
             - piped filenames from previous command via self.__pipe_input.
         """
-        from s3v.p5inspect import p5view
+        from cfs3.p5inspect import p5view
 
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))

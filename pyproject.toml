@@ -32,17 +32,16 @@ dependencies = [
     'minio',
     'bitmath',
     'cf-python',
-    'udunits2',
     'pyfive @ git+https://github.com/ncas-cms/pyfive.git@optimise',
     'fsspec'
 ]
 description = "Lightweight tool for investigating data files in an s3 repository"
 license = {text = "BSD License, Version 3-Clause"}
-name = "s3v"
+name = "cfs3"
 requires-python = ">=3.10"
 
 [project.scripts]
-s3view = "s3v.s3view:main"
+cfs3iew = "cfs3.s3iew:main"
 
 [project.optional-dependencies]
 test = [
@@ -75,7 +74,7 @@ doc = [
 [tool.setuptools]
 include-package-data = true
 license-files = ["LICENSE"]
-packages = ["s3v"]
+packages = ["cfs3"]
 zip-safe = false  # possibly yes
 
 [tool.setuptools.dynamic]

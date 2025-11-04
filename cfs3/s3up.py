@@ -1,6 +1,6 @@
 from pathlib import Path
 from minio import Minio
-from s3v.s3core import get_user_config, get_client, sanitise_metadata, desanitise_metadata
+from cfs3.s3core import get_user_config, get_client, sanitise_metadata, desanitise_metadata
 import os
 import tempfile
 import numpy as np
@@ -40,7 +40,7 @@ class Uploader:
                 verification = 1 : verify size of the uploaded object corresponds to local object
                 other forms of verification (checksums etc, not yet supported) 
         """
-        self.logger = logging.getLogger(f's3v.Uploader[{alias}]')
+        self.logger = logging.getLogger(f'cfs3.Uploader[{alias}]')
         self.client = get_client(alias)
         self.bucket = default_bucket
         self.verify = verification

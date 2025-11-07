@@ -138,7 +138,7 @@ class OutputHandler:
 
 
 
-class s3cmd(cmd2.Cmd):
+class s3cmd(cmd2.Cmd): 
     """ 
     Provides a view into one or more S3 repositories
     configured with a user's minio mc environment.
@@ -187,7 +187,7 @@ class s3cmd(cmd2.Cmd):
         self.pipe_consumers = ['p5dump',]
 
 
-    def get_names(self):
+    def get_names(self): 
         # This method returns a list of all command method names
         names = super().get_names()
         filtered = []
@@ -419,7 +419,11 @@ class s3cmd(cmd2.Cmd):
             self.houtput(line)
 
     def do_lb(self,arg=None):
-        """ Navigate around a S3 service"""
+        """ 
+        List buckets in the current location.
+
+        Information about bucket contents can only be gathered after using the ``cb`` command.
+        """
         if arg is not None:
             if arg == "":
                 pass
@@ -432,7 +436,12 @@ class s3cmd(cmd2.Cmd):
     loc_args.add_argument('alias', help='Where alias is a valid alias from your minio config file')
     @cmd2.with_argparser(loc_args)
     def do_loc(self, arg):
-        "Set context to a particular minio S3 location as described in user minio config file"
+        """
+        Set context to a particular S3 location as described in user minio config file.
+
+        (We use the minio config file to allow users to keep credentials for multiple S3
+        locations in one place.)
+        """
         try:
             self._navconfig(arg.alias)
             if not self.maybe_anon:
@@ -446,8 +455,11 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(cb_args)
     def do_cb(self, arg):
         """
-        Change to a (new) bucket. This is not treated as just a move to another directory, as the
-        notion of a bucket is quite different in S3 from that of a directory. Get used to it.
+        Change to a (new) bucket. 
+        
+        This is not treated as just a move to another directory, as the notion of a bucket is quite
+        different in S3 from that of a directory. It's more like moving to the root of a different
+        file system.
         """
         bucket = arg.bucket
         if not self.maybe_anon and bucket not in self.buckets:
@@ -472,7 +484,8 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(ls_args)
     def do_ls(self, arg='/'):
         """ 
-        List the files and directories in a bucket, potentially with a wild card.
+        List the files and directories in a bucket, potentially with a wild card. 
+
         """
 
         def reorder(mymeta):
@@ -589,7 +602,10 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(fi_args)
     def do_match(self, args):
         """
-        Find files which match a set of metadata expressed as key value pairs, optionally matching a particular path
+        Find files which match a set of metadata expressed as key value pairs, optionally matching a
+        particular path. 
+
+        This metadata match is using the DRS metadaata which has been uploaded with the file.
         """ 
         if self.bucket is None:
             self.poutput(_err('Must select bucket'))
@@ -629,6 +645,9 @@ class s3cmd(cmd2.Cmd):
     def do_cd(self,line):
         """
         Change default position in bucket to expose contents as if it were a file system directory.
+
+        This exploits the minio notion of prefixes to give a directory like view of some of the
+        content in a bucket.
         """
         if self.bucket is None:
             self.poutput(_err('You need to select a bucket first ("cd bucket_name")'))
@@ -709,8 +728,10 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(mv_args)
     def do_mv(self, command):
         """
-        Rename files within a bucket (server side)
-        This is an expensive operation!
+        Rename files within a bucket (server side).
+
+        This is an expensive operation as it really involves a server-side copy, not a renaming
+        operation as you might expect in a normal file system.
         """
         try:
             source, target = tuple(command.targets)
@@ -759,6 +780,8 @@ class s3cmd(cmd2.Cmd):
     @cmd2.with_argparser(tag_args)
     def do_tag(self, targets):
         """
+        Tag a previously existing object with a key value pair.
+        
         Allows users with object stores who support tagging to tag objects dynamically
         rather than utilise the user metadata option. Many object stores, including
         the author's one, do not support this. This might work for you, it doesn't

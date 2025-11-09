@@ -32,7 +32,7 @@ dependencies = [
     'minio',
     'bitmath',
     'cf-python',
-    'pyfive @ git+https://github.com/ncas-cms/pyfive.git@optimise',
+    'pyfive', #@ git+https://github.com/ncas-cms/pyfive.git@optimise',
     'fsspec'
 ]
 description = "Lightweight tool for investigating data files in an s3 repository"

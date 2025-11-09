@@ -22,6 +22,8 @@ from pathlib import Path
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 root = Path(__file__).absolute().parent.parent
 sys.path.insert(0, str(root))
+exts = root/'doc/ext'
+sys.path.insert(0, str(exts))
 
 import cfs3
 
@@ -46,6 +48,8 @@ if rtd_version not in ["latest", "doc"]:  # TODO: add "stable" once we have it
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
+
+
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.doctest',
@@ -57,6 +61,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
     'autodocsumm',
+    'cmd2_formatter',
 ]
 
 autodoc_default_options = {
@@ -76,6 +81,7 @@ autodoc_mock_imports = [
     'nested_lookup',
     'psutil',
     'stratify',
+    "cf", "cfdm", "distributed"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -418,223 +424,6 @@ from gensidebar import generate_sidebar
 
 generate_sidebar(globals(), "cfs3")
 
-import inspect
-import textwrap
-import cmd2
-from sphinx.ext.autodoc import FunctionDocumenter
-from sphinx.ext.autosummary import Autosummary
-from docutils import nodes
-from docutils.statemachine import ViewList
-import sphinx.ext.autodoc.directive as autodocdir
-from sphinx import addnodes
-
-# ---------------------------------------------------------------------
-# Helper functions for argparse formatting
-# ---------------------------------------------------------------------
-def format_argparser_summary(parser):
-    """Return short one-line summary of parser arguments for table display."""
-    parts = []
-    for a in parser._actions:
-        if getattr(a, "help", None) == "==SUPPRESS==":
-            continue
-        if not getattr(a, "option_strings", None):
-            parts.append(a.dest)
-        else:
-            parts.append("/".join(a.option_strings))
-    return ", ".join(parts) if parts else ""
 
 
-def format_argparser_rst(parser):
-    """Return full RST-formatted argument list for docstrings."""
-    lines = []
-    positionals = [a for a in parser._actions if not a.option_strings and a.help != "==SUPPRESS=="]
-    if positionals:
-        lines.append("**Positional Arguments:**")
-        for a in positionals:
-            lines.append(f"- ``{a.dest}``: {a.help or ''}")
 
-    optionals = [a for a in parser._actions if a.option_strings and a.help != "==SUPPRESS=="]
-    if optionals:
-        lines.append("")
-        lines.append("**Optional Arguments:**")
-        for a in optionals:
-            opts = ", ".join(a.option_strings)
-            lines.append(f"- ``{opts}``: {a.help or ''}")
-
-    return [textwrap.fill(line, width=90) if not line.startswith("**") else line for line in lines]
-
-
-# ---------------------------------------------------------------------
-# autodoc: skip members except do_* commands
-# ---------------------------------------------------------------------
-def autodoc_skip_member(app, what, name, obj, skip, options):
-    """Keep only do_* methods defined on subclasses of cmd2.Cmd."""
-    if inspect.isclass(obj) and issubclass(obj, cmd2.Cmd):
-        return False
-
-    if inspect.isfunction(obj) and name.startswith("do_"):
-        defining_class = getattr(obj, "__qualname__", "").split(".")[0]
-        if defining_class == "Cmd":  # inherited from base cmd2.Cmd
-            return True
-        return False
-
-    return True
-
-
-# ---------------------------------------------------------------------
-# Custom documenter for cmd2 commands
-# ---------------------------------------------------------------------
-class Cmd2CommandDocumenter(FunctionDocumenter):
-    """Documenter for cmd2 do_* methods."""
-
-    objtype = "cmd2command"
-    directivetype = "function"
-    priority = FunctionDocumenter.priority + 10
-
-    @classmethod
-    def can_document_member(cls, member, membername, isattr, parent):
-        return inspect.isfunction(member) and membername.startswith("do_")
-
-    def format_name(self):
-        name = getattr(self.object, "__name__", "")
-        return name[3:] if name.startswith("do_") else name
-
-    def get_signature(self, *args, **kwargs):
-        sig = super().get_signature(*args, **kwargs) or ""
-        sig = sig.strip()
-        if sig.startswith("(") and sig.endswith(")"):
-            inner = sig[1:-1].strip()
-            parts = [p.strip() for p in inner.split(",") if p.strip()]
-            if parts and parts[0] == "self":
-                parts = parts[1:]
-            sig = "(" + ", ".join(parts) + ")"
-        return sig
-
-    def add_content(self, more_content=None):
-        """Append argparse information if available."""
-        parser = getattr(self.object, "argparser", None)
-        if not parser:
-            return
-
-        lines = [""]
-        lines.append("**Command Arguments:**")
-        lines.extend(["    " + l for l in format_argparser_rst(parser)])
-
-        viewlist = ViewList()
-        srcname = f"{self.object.__module__}.{self.object.__name__} (autodoc)"
-        for line in lines:
-            viewlist.append(line, srcname)
-
-        super().add_content(viewlist)
-
-
-# ---------------------------------------------------------------------
-# Autosummary patch to rename do_* and add summaries
-# ---------------------------------------------------------------------
-_original_get_items = Autosummary.get_items
-
-
-def autosummary_get_items(self, *args, **kwargs):
-    """Patch Autosummary.get_items to handle cmd2 commands."""
-    if len(args) == 1:
-        return _original_get_items(self, *args, **kwargs)
-
-    items = _original_get_items(self, *args, **kwargs)
-    new_items = []
-    for name, sig_text, summary, real_name in items:
-        if name.startswith("do_"):
-            cmd_name = name[3:]
-            try:
-                module_name, func_name = real_name.rsplit(".", 1)
-                mod = __import__(module_name, fromlist=[func_name])
-                func = getattr(mod, func_name)
-                doc = inspect.getdoc(func)
-                if doc:
-                    summary = doc.strip().splitlines()[0]
-                parser = getattr(func, "argparser", None)
-                if parser:
-                    arg_summary = format_argparser_summary(parser)
-                    if arg_summary:
-                        summary = f"{summary} ({arg_summary})" if summary else arg_summary
-            except Exception:
-                pass
-            new_items.append((cmd_name, sig_text, summary, real_name))
-        else:
-            new_items.append((name, sig_text, summary, real_name))
-    return new_items
-
-
-Autosummary.get_items = autosummary_get_items
-
-
-# ---------------------------------------------------------------------
-# doctree post-processor to remove stray "Miscellaneous"/empty "Commands"
-# ---------------------------------------------------------------------
-def _is_bold_commands_paragraph(node):
-    if isinstance(node, nodes.paragraph):
-        t = node.astext().strip()
-        return t in ("Commands:", "**Commands:**")
-    return False
-
-def fix_miscellaneous_sections(app, doctree, fromdocname):
-    for section in list(doctree.traverse(nodes.section)):
-        titles = section.traverse(nodes.title)
-        if not titles:
-            continue
-        title_text = titles[0].astext().strip()
-
-        contains_cmd2 = any(
-            isinstance(n, addnodes.desc) and any(
-                isinstance(child, addnodes.desc_name)
-                and child.astext().strip()
-                and not child.astext().startswith("do_")
-                for child in n.children
-            )
-            for n in section.traverse(addnodes.desc)
-        )
-
-        if not contains_cmd2:
-            contains_cmd2 = any(
-                "Command Arguments:" in n.astext()
-                for n in section.traverse(nodes.paragraph)
-            )
-
-        if contains_cmd2 and title_text == "Miscellaneous":
-            titles[0].children[:] = [nodes.Text("Commands")]
-
-    # create a Commands section if none exists
-    top_sections = [n for n in doctree.children if isinstance(n, nodes.section)]
-    if not top_sections:
-        cmd_nodes = [n for n in doctree.traverse(addnodes.desc)
-                     if any(isinstance(child, addnodes.desc_name) for child in n.children)]
-        if cmd_nodes:
-            new_section = nodes.section(ids=["commands"])
-            new_section += nodes.title(text="Commands")
-            for n in cmd_nodes:
-                n.parent.remove(n)
-                new_section += n
-            doctree += new_section
-
-
-def rename_miscellaneous_to_commands(app, doctree, fromdocname):
-    """
-    Final safety net:
-    Rename any visible section or rubric titled 'Miscellaneous' to 'Commands'.
-    Works regardless of Sphinx internal node hierarchy.
-    """
-    for title in doctree.traverse(nodes.title):
-        if title.astext().strip() == "Miscellaneous":
-            title.children[:] = [nodes.Text("Commands")]
-
-    for rubric in doctree.traverse(nodes.rubric):
-        if rubric.astext().strip() == "Miscellaneous":
-            rubric.children[:] = [nodes.Text("Commands")]
-
-# ---------------------------------------------------------------------
-# Sphinx setup
-# ---------------------------------------------------------------------
-def setup(app):
-    app.add_autodocumenter(Cmd2CommandDocumenter)
-    app.connect("autodoc-skip-member", autodoc_skip_member)
-    app.connect("doctree-resolved", fix_miscellaneous_sections)
-    app.connect("doctree-resolved", rename_miscellaneous_to_commands)

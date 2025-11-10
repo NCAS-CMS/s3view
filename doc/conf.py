@@ -16,6 +16,10 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
+import cfs3
+sys.path.append(os.path.dirname(__file__))
+from gensidebar import generate_sidebar
+
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -24,8 +28,6 @@ root = Path(__file__).absolute().parent.parent
 sys.path.insert(0, str(root))
 exts = root/'doc/ext'
 sys.path.insert(0, str(exts))
-
-import cfs3
 
 __version__ = cfs3.__version__
 
@@ -420,8 +422,8 @@ intersphinx_mapping = {
 
 # -- Custom Document processing ----------------------------------------------
 
-sys.path.append(os.path.dirname(__file__))
-from gensidebar import generate_sidebar
+
+
 
 generate_sidebar(globals(), "cfs3")
 

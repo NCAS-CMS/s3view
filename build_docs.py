@@ -1,6 +1,7 @@
-# Normally we build the docs by running sphhinx-build . doc from the cmamnd line,
-# but this script can be used to build the docs from within Python if needed (e.getattr
-# so we can use a debugger on the sphinx build process itself).
+# Normally we build the docs by running sphhinx-build . doc from the cmamnd
+# line,but this script can be used to build the docs from within Python if
+# needed (e.getattr so we can use a debugger on the sphinx build process
+# itself).
 
 import sphinx.application
 

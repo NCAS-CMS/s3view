@@ -10,30 +10,32 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
 from io import StringIO
 import argparse
-
 from cfs3.drs_view import drs_view, drs_metaview, drs_select
 import bitmath
-import sys
 
-import logging
+
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
+
 
 def fetch_metadata(client, bucket, file_dict):
     """ Helper function to clean up calling metadata signature"""
     return file_dict, client.stat_object(bucket, file_dict['n'])
 
+
 def match_metadata(client, bucket, object_name, matches):
     """ Helper function to grab only files with metadata matches"""
     result = client.stat_object(bucket, object_name)
-    meta = {k[11:]:v for k,v in result.metadata.items() if k.startswith('x-amz-meta')}
+    meta = {k[11:]: v for k, v in result.metadata.items() 
+            if k.startswith('x-amz-meta')}
     meta = desanitise_metadata(meta)
-    for k,v in matches.items():
+    for k, v in matches.items():
         if k not in meta:
             return False, object_name
         else:
-            if meta[k]!=v:
-                return False, object_name  
+            if meta[k] != v:
+                return False, object_name
     return True, object_name
+
 
 def key_value(s: str):
     """ 
@@ -41,12 +43,14 @@ def key_value(s: str):
     Raises argparse.ArgumentTypeError if format is invalid.
     """
     parts = s.split('=')
-    if len(parts) !=2:
-        raise argparse.ArgumentTypeError(f"Expected key=value format, got '{s}'")
+    if len(parts) != 2:
+        raise argparse.ArgumentTypeError(
+            f"Expected key=value format, got '{s}'")
     key, value = parts
-    key, value = key.strip(),value.strip()
+    key, value = key.strip(), value.strip()
     if not key or not value:
-        raise argparse.ArgumentTypeError(f"Neither key nor value can be empty in '{s}'")
+        raise argparse.ArgumentTypeError(
+            f"Neither key nor value can be empty in '{s}'")
     return key, value
 
 
@@ -76,7 +80,7 @@ class OutputHandler:
         self.signature = None
         self.last_cache = None
 
-    def write(self,string):
+    def write(self, string):
         """ 
         this is the output method, writes normal output
         and grabs a copy for later use in pipe and/or to
@@ -129,21 +133,33 @@ class OutputHandler:
         Call this at the end of a method to populate the cache
         """
         if self.signature:
-            self.cache[self.signature]=self.lines
+            self.cache[self.signature] = self.lines
             self.last_cache = self.lines
-            self.cmd.log.debug(f'[cache] population had {len(self.lines)} lines')
+            self.cmd.log.debug(
+                f'[cache] population had {len(self.lines)} lines')
         else:
-            self.cmd.log.debug(f'[cache] not used')
+            self.cmd.log.debug('[cache] not used')
             self.signature = None
 
 
-
-class s3cmd(cmd2.Cmd): 
+class s3cmd(cmd2.Cmd):
     """ 
-    Provides a view into one or more S3 repositories
-    configured with a user's minio mc environment.
+    s3cmd is the class which implements the s3view capabilities for viewing contents in S3 repositories
+
+    The methods of this class implement the commands seen in the ``s3view`` environment. 
+    There is some limited capability to "pipe" information between selected commands 
+    (using :: for piping), and the output of all commands can be piped to the normal 
+    unix shell.
+
     """
+
+    _autodoc_attrs = ['pipe_producers', 'pipe_consumers']
+    pipe_producers = ['ls',]
+    """ List of commands that can produce content to consume via internal pipe "::" """
+    pipe_consumers = ['p5dump',]
+    """ List of commands that can consume content from an internal pipe "::" """
     allow_redirection = True
+
     def __init__(self, path=None):
 
         # Set include_ipy to True to enable the "ipy" command which runs an interactive IPython shell
@@ -175,19 +191,16 @@ class s3cmd(cmd2.Cmd):
         self.mydirs = None
         self.maybe_anon = False
 
-        self.hidden_commands = {'eof','_relative_run_script',
-            'alias', 'macro', 'edit', 'run_pyscript', 'run_script',
-            'shortcuts', 'shell', 'py', 'history', 'set', 'suspend'
-        }
+        self.hidden_commands = {'eof', '_relative_run_script',
+                                'alias', 'macro', 'edit', 'run_pyscript', 
+                                'run_script', 'shortcuts', 'shell', 'py', 
+                                'history', 'set', 'suspend'
+                                }
 
-        self.output_handler=OutputHandler(self)
-        self.houtput=self.output_handler.write
+        self.output_handler = OutputHandler(self)
+        self.houtput = self.output_handler.write
 
-        self.pipe_producers = ['ls',]
-        self.pipe_consumers = ['p5dump',]
-
-
-    def get_names(self): 
+    def get_names(self):
         # This method returns a list of all command method names
         names = super().get_names()
         filtered = []
@@ -205,27 +218,26 @@ class s3cmd(cmd2.Cmd):
         self.poutput(_i('Choose one with "loc x" '))
 
     def _confirm(self, message, default='N'):
-        defstr = {"Y":'Y/n',"N":'n/Y'}[default]
         self.poutput(f'{message} [y/n]')
         while True:
             ans = input()
             if ans == "":
                 ans = default 
             try:
-                return {'y':True,'n':False}[ans.lower()]
-            except:
+                return {'y': True, 'n': False}[ans.lower()]
+            except Exception:
                 self.poutput(_err('Please respond with \'y\' or \'n\'.\n'))
 
     def _navconfig(self, target):
         """ Unpick a navigation command and configure """
         bits = target.split('/')
-        if bits[0]!=self.alias:
+        if bits[0] != self.alias:
             self.alias = bits[0]
             self.prompt = _p(f'{self.alias}> ')
             try:
                 self.client = get_client(self.alias)
             except ValueError as e:
-                #FIXME: the error handling for choosing a non-existent bucket is borked
+                # FIXME: the error handling for choosing a non-existent bucket is borked
                 self.poutput(_err(e))
                 self.prompt = 's3> '
                 self.bucket = self.alias
@@ -264,17 +276,18 @@ class s3cmd(cmd2.Cmd):
         else:
             prefix = path
         # this is a generator
-        objects = self.client.list_objects(self.bucket,include_user_meta=True, prefix=prefix)
+        objects = self.client.list_objects(self.bucket,
+                                           include_user_meta=True,
+                                           prefix=prefix)
 
         # if we are limited, we can collapse our generator to a list
         if limit is not None:
-            objects = list(itertools.islice(objects,limit))
+            objects = list(itertools.islice(objects, limit))
           
-
         if match is not None:
             objects = [o for o in objects if Path(o.object_name).match(match)]
 
-        sum  = 0
+        sum = 0
         files = 0
         dirs = 1
         mydirs = []
@@ -289,11 +302,11 @@ class s3cmd(cmd2.Cmd):
                 mydirs.append([o.object_name, fmt_size(dsum)])
             else:
                 sum += o.size
-                files +=1
-                myfiles.append({'n':o.object_name, 
-                                's':fmt_size(o.size),
-                                'd':fmt_date(o.last_modified),
-                                't':o.tags,
+                files += 1
+                myfiles.append({'n': o.object_name, 
+                                's': fmt_size(o.size),
+                                'd': fmt_date(o.last_modified),
+                                't': o.tags,
                                 })
         return sum, files, dirs, mydirs, myfiles
 
@@ -305,11 +318,16 @@ class s3cmd(cmd2.Cmd):
         volume, nfiles, ndirs, mydirs, myfiles = self._recurse(path)
         if path == '':
             path = '/'
-        self.poutput(_i('Location: ') + path + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))
-        self.poutput(_i('This directory contains ')+ str(len(myfiles)) + _i(' files and ') + str(len(mydirs)) + _i(' directories.'))
+        self.poutput(_i('Location: ') + path + _i(' contains ') +
+                     fmt_size(volume) + _i(' in ') + str(nfiles) +
+                     _i(' files/objects.'))
+        self.poutput(_i('This directory contains ') + str(len(myfiles)) + 
+                     _i(' files and ') + str(len(mydirs)) + 
+                     _i(' directories.'))
         if len(mydirs) > 0:
-            self.poutput(_i('Sub-directories are : ')+_e(' '.join([f'{d[0]}({d[1]})' for d in mydirs])))
-        self.mydirs=mydirs
+            self.poutput(_i('Sub-directories are : ') +
+                         _e(' '.join([f'{d[0]}({d[1]})' for d in mydirs])))
+        self.mydirs = mydirs
 
     def __handle_path(self, path):
         """
@@ -327,26 +345,27 @@ class s3cmd(cmd2.Cmd):
                 return self.path
             else:
                 p = str(Path(self.path).parent)
-                return {True:'',False:p}[p=='.']
+                return {True: '', False: p}[p == '.']
         else:
             return self.path + path
         
-
     def _getmetadata(self, myfiles):
         mymetadata = []
         # loop runs with minimum of 32 or the number of processors multiplied by 5, based on Python’s default configuration.
         with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(fetch_metadata, self.client, self.bucket, f): f for f in myfiles}
+            futures = {executor.submit(
+                       fetch_metadata, self.client, self.bucket, f):
+                       f for f in myfiles}
             for future in as_completed(futures):
                 try:
                     f, result = future.result()
-                    meta = {k[11:]:v for k,v in result.metadata.items() if k.startswith('x-amz-meta')}
+                    meta = {k[11:]: v for k, v in result.metadata.items()
+                            if k.startswith('x-amz-meta')}
                     mymetadata.append((f, desanitise_metadata(meta)))
                 except Exception as e:
                     self.poutput(_err(f'Error fetching metadata {e}'))
         mymetadata = sorted(mymetadata, key=lambda x: x[0]['n'])
         return mymetadata
-
 
     def precmd(self, statement):
         """
@@ -781,7 +800,7 @@ class s3cmd(cmd2.Cmd):
     def do_tag(self, targets):
         """
         Tag a previously existing object with a key value pair.
-        
+
         Allows users with object stores who support tagging to tag objects dynamically
         rather than utilise the user metadata option. Many object stores, including
         the author's one, do not support this. This might work for you, it doesn't

@@ -58,9 +58,9 @@ def generate_sidebar(conf, conf_api):
 
     _header("cfs3", "cfs3")
     _write("cfs3", "Introduction", "introduction")
-    _write("cfs3", "Object Store Basics", "object_stores")
     _write("cfs3", "s3view", "s3view")
     _write("cfs3", "cftools", "cftools")
+
     _write("cfs3", "Change Log", "changelog")
     _endl()
 

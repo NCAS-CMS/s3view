@@ -1,3 +1,5 @@
+.. _s3view: 
+
 s3view
 ***********
 
@@ -8,5 +10,5 @@ It is designed to provide a way to explore and discover data stored in object st
 exploiting the metadata stored within the files in an efficient was as possible by utilising their 
 known structure, by  caching information between calls and by exploiting parallelism to speed up access. 
 
-.. autocmd2:: cfs3.s3cmd.s3cmd
+.. autocmd2:: cfs3.s3cmd
    :members:

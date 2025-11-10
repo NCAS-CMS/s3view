@@ -6,7 +6,6 @@
    :caption: cfs3
 
     Introduction <introduction>
-    Object Store Basics <object_stores>
     s3view <s3view>
     cftools <cftools>
     Change Log <changelog>

@@ -157,15 +157,7 @@ class Cmd2MethodDocumenter(MethodDocumenter):
     def can_document_member(cls, member, membername, isattr, parent):
         """Document do_* methods in cmd2 classes."""
 
-        print('can_document_member:', membername)
-
-        #if not MethodDocumenter.can_document_member(member, membername, isattr, parent):
-        #    return False
-        
-        # Check if parent is a cmd2.Cmd subclass
-        #parent_obj = getattr(parent, "object", None)
-        #if not (inspect.isclass(parent_obj) and issubclass(parent_obj, cmd2.Cmd)):
-        #    return False
+        #print('can_document_member:', membername)
         
         # Only document do_* methods
         if not membername.startswith("do_"):
@@ -175,7 +167,7 @@ class Cmd2MethodDocumenter(MethodDocumenter):
         if hasattr(cmd2.Cmd, membername):
             return False
         
-        print('will_document_member:', membername)
+        #print('will_document_member:', membername)
 
         return True
     
@@ -196,7 +188,6 @@ class Cmd2MethodDocumenter(MethodDocumenter):
         # Optional flags
         opts = ["/".join(a.option_strings) for a in parser._actions if a.option_strings]
         parts = pos + opts
-        print (parts)
         return f" {' '.join(parts)}"
 
     

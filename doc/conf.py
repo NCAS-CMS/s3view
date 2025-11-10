@@ -415,6 +415,7 @@ intersphinx_mapping = {
     'numpy': ('https://numpy.org/doc/stable/', None),
     'python': ('https://docs.python.org/3/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    "cf": ("https://ncas-cms.github.io/cf-python/", None),
 }
 
 # -- Custom Document processing ----------------------------------------------

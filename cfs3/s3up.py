@@ -1,10 +1,7 @@
 from pathlib import Path
-from minio import Minio
-from cfs3.s3core import get_user_config, get_client, sanitise_metadata, desanitise_metadata
+
+from cfs3.s3core import get_client, sanitise_metadata, desanitise_metadata
 import os
-import tempfile
-import numpy as np
-import pytest
 import time
 import inspect
 from functools import wraps
@@ -80,6 +77,8 @@ class Uploader:
             raise 
         if not found:
             ok = self.client.make_bucket(bucket)
+            if not ok:
+                raise RuntimeError(f'Unable to make bucket {bucket}')
             print('Created bucket', bucket)
 
         #upload
@@ -92,7 +91,7 @@ class Uploader:
             etag = result.etag
             if self.verify:
                 size = Path(file_path).stat().st_size
-                self.do_verify(size,verify, etag, bucket, object_name, metadata)
+                self.do_verify(size, self.verify, etag, bucket, object_name, metadata)
             e3 = time.time()
         except:
             raise
@@ -109,7 +108,7 @@ class Uploader:
         for path in paths:
             metadata = meta_func(path) if meta_func else None
             objname = objName_func(path) if objName_func else None
-            self.upload_file(path, bucket=bucket, metadata=metadata, object_name=objName)
+            self.upload_file(path, bucket=bucket, metadata=metadata, object_name=objname)
 
 
     @mirror_signature(upload_file)
@@ -133,7 +132,7 @@ class Uploader:
         for path in paths:
             metadata = meta_func(path) if meta_func else None
             objname = objName_func(path) if objName_func else None
-            self.move_file_to_s3(path, bucket=bucket, metadata=metadata, object_name=objName)
+            self.move_file_to_s3(path, bucket=bucket, metadata=metadata, object_name=objname)
 
     def do_verify(self, verify, file_size, etag, bucket, object_name, metadata):
         """ 

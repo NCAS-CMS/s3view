@@ -1,4 +1,4 @@
-from cmd2 import Bg, Fg, ansi
+from cmd2 import Fg, ansi
 import logging
 
 def __style(string, col):

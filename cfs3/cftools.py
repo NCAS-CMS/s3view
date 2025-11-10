@@ -2,8 +2,6 @@ import cf
 from cfs3.s3up import Uploader
 from cfs3.cfchunking import get_optimal_chunkshape
 from cfs3.logging_utils import get_logger
-import logging
-import os
 from pathlib import Path
 import json
 
@@ -59,9 +57,9 @@ class CFSplitter:
             self.logger.debug(f'Setting chunkshape {chunk_shape} for {field.identity()} in [{filename.name}]')
             field.data.nc_set_dataset_chunksizes(chunk_shape)
 
-            self.logger.debug(f'Going to metadata handler')
+            self.logger.debug('Going to metadata handler')
             metadata, field = self.meta_handler(filename, field)
-            self.logger.debug(f'Gooing to filename handler')
+            self.logger.debug('Going to filename handler')
             output_filename = self.output_folder/self.filename_handler(filename, field, metadata) 
             
             ncout = output_filename.with_suffix('.nc')
@@ -257,7 +255,7 @@ class FileNameFix:
         elif delta> cf.TimeDuration(359,'day') and delta < cf.TimeDuration(367,'day'): 
             return 1,'y'
         else:
-            if tdim.calendar == '360_day':
+            if td.calendar == '360_day':
                 return int(delta/360),'y'
             else:
                 return int(delta/360.25),'y'

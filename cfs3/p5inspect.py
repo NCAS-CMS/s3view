@@ -1,7 +1,6 @@
 from pyfive.inspect import p5ncdump
 from cfs3.s3core import get_user_config, Capturing
 import s3fs
-from pathlib import Path
 
 def p5view(alias, bucket, path, object, special=False):
     """ 

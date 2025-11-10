@@ -98,7 +98,6 @@ def get_chunkshape(shape, volume, word_size=4, logger=None, scale_tol=0.8):
     
     n_chunks = int(size/v)
     root = v**(1/shape.size)
-    dlen = np.sum(shape)
 
     # first get a scaled set of initial guess divisors
     initial_root=np.full(shape.size, root)

@@ -548,7 +548,8 @@ class s3cmd(cmd2.Cmd):
         if limit is None:
             self.houtput(_i('Location: ') + self.path + _i(' contains ')+ fmt_size(volume) + _i(' in ') + str(nfiles) + _i(' files/objects.'))
             directory = 'directory'
-            if extras: directory = "match"
+            if extras: 
+                directory = "match"
             self.houtput(_i(f'This {directory} contains ')+ str(len(myfiles)) + _i(' files and ') + str(len(mydirs)) + _i(' directories.'))
         else:
             self.houtput(_i(f'Listing {max(nfiles,limit)} files/objects ('+fmt_size(volume)+')'))
@@ -702,6 +703,9 @@ class s3cmd(cmd2.Cmd):
             self.poutput(_err(f'Bucket {bucket_name} already exits')) 
             self.cb(None)
         r = self.client.make_bucket(bucket_name)
+        if r:
+            self.poutput(self._err('Unable to make bucket properly'))
+            return 
         self.buckets.append(bucket_name)
         return self.do_cb(f'cb {bucket_name}')
     
@@ -755,7 +759,7 @@ class s3cmd(cmd2.Cmd):
         try:
             source, target = tuple(command.targets)
             self.poutput(_i('Command is mv ')+ source+ _i(' to ')+target)
-        except:
+        except Exception:
             self.poutput(_err(f'Invalid mv command - mv "{command.targets}"'))
             return self.do_cd(self.path)
         
@@ -882,7 +886,7 @@ class s3cmd(cmd2.Cmd):
         selects = dict(arg.select) if arg.select else {}
 
         if selects:
-            myfiles,skipped = drs_select(myfiles, selects, arg.drs)
+            myfiles, skipped = drs_select(myfiles, selects, arg.drs)
 
         if arg.output:
             output_arg = arg.output[0]
@@ -989,7 +993,7 @@ class s3cmd(cmd2.Cmd):
                     input_files.append(line.strip())
                     
         elif arg.object:
-            self.log.debug(f'[p5dump] is normal')
+            self.log.debug('[p5dump] is normal')
             input_files = [arg.object,]
 
         if not input_files:

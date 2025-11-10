@@ -11,7 +11,7 @@ def __get_collapsed(collapse, drs=None):
     if collapse != '':
         try:
             collapsed = collapse.split(',')
-        except:
+        except Exception:
             raise ValueError(f'Collapse option - {collapsed} - is not a python list in a string!')
         
     if drs:
@@ -59,7 +59,7 @@ def drs_view(myfiles, drs, selects={}, collapse=''):
 
     try:
         drs = drs.split(',')
-    except:
+    except Exception:
         raise ValueError(f'DRS provided - {drs} - is not a comma seperated string!')
 
     contents = {k:[] for k in drs}
@@ -135,7 +135,7 @@ def drs_select(files, selections, drs):
             parsed = parse_filename_to_drs_components(f['n'], drsc)
             if all(parsed.get(k) == v for k,v in selections.items()):
                 results.append(f)
-        except ValueError as e:
+        except ValueError:
             skipped.append(f)
     return results, skipped
     

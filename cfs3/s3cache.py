@@ -445,7 +445,7 @@ class PersistentCachedMinio:
         # Fetch from S3
         try:
             stat = self._client.stat_object(bucket, key)
-        except Exception as e:
+        except Exception:
             # If we have cached row, but S3 failed and cache exists, return cached (even if stale)
             if row:
                 co = self._rows_to_cached_objects([row])[0]

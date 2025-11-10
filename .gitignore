@@ -4,3 +4,8 @@ __pycache__/
 .vscode
 dist
 *.egg-info
+doc/doc
+doc/html
+.DS_Store
+eg.py
+_sidebar.rst.inc

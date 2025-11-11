@@ -1,24 +1,7 @@
-from io import StringIO 
-import sys
 import cf
-from s3v.s3core import get_user_config
+from cfs3.s3core import get_user_config, Capturing
 
-class Capturing(list):
-    """ 
-    Used to capture output from science functions that have internal print statements.
-    Usage for calling my_function:
-        with Capturing() as output_list:
-            my_function(my_arguments)
-    output_list will be a list of output strings
-    """
-    def __enter__(self):
-        self._stdout = sys.stdout
-        sys.stdout = self._stringio = StringIO()
-        return self
-    def __exit__(self, *args):
-        self.extend(self._stringio.getvalue().splitlines())
-        del self._stringio    # free up some memory
-        sys.stdout = self._stdout
+
 
 def cfread(alias, bucket, path, object, short=False, complete=False):
     """ 
@@ -50,6 +33,8 @@ def cfread(alias, bucket, path, object, short=False, complete=False):
                 print(f)
     return flist, output
 
+
+
     
 def test_s3():
     alias = 'hpos'
@@ -57,7 +42,8 @@ def test_s3():
     path = ''
     object = 'common_cl_a.nc'
     flist, output = cfread(alias, bucket, path, object)
-    print(output)
+    for o in output:
+        print(o)
 
 
 if __name__=="__main__":

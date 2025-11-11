@@ -21,7 +21,7 @@ jobs:
     runs-on: "ubuntu-latest"
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
     name: Linux Python ${{ matrix.python-version }}
     steps:
@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0
       - uses: conda-incubator/setup-miniconda@v3
         with:
-          activate-environment: s3view
+          activate-environment: cfs3
           environment-file: environment.yml
           python-version: ${{ matrix.python-version }}
           miniforge-version: "latest"
@@ -38,10 +38,10 @@ jobs:
       - run: conda --version
       - run: python -V
       - run: conda list
-      - run: pip install -e .
+      - run: pip install --use-pep517 -e .
       - run: conda list
       - run: which s3view
       - run: s3view --help
       # turn these on when they will be needed
       # - run: flake8
-      # - run: pytest -n 2
+      # - run: pytest -n 2  # at least after pyfive 1.0

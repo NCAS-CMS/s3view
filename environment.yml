@@ -1,18 +1,26 @@
 ---
-name: s3view
+name: cfs3
 channels:
   - conda-forge
   - nodefaults
 
 dependencies:
-  - cmd2 >1
-  # use for conda-forge package, when available
-  # - cf-python >=3.17.0
-  - minio
-  - pip
   - python >=3.10
-  # needed by cf-python; not in cf-python PyPI/git recipe
-  # remove when using conda-forge cf-python
+  - pip !=21.3
+  - bitmath
+  - cf-python
+  - cmd2 >2
+  - fsspec
+  - minio
+  - pyfive
   - udunits2
-  - pip:
-    - git+https://github.com/davidhassell/cfdm.git@h5-read-hdf5-chunks-hack
+  # for tests
+  - pytest
+  - pytest-html !=2.1.0
+  - pytest-metadata >=1.5.1
+  - pytest-mock
+  - pytest-xdist
+  # for docs
+  - autodocsumm
+  - sphinx
+  - sphinx_rtd_theme

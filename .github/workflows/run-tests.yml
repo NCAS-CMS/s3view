@@ -42,6 +42,7 @@ jobs:
       - run: conda list
       - run: which s3view
       - run: s3view --help
-      # turn these on when they will be needed
       # - run: flake8
-      # - run: pytest -n 2  # at least after pyfive 1.0
+      - run: pip install --use-pep517 -e .[test]
+      - run: conda list
+      - run: pytest --ignore=tests/test_p5dump.py --ignore=tests/test_minio_stuff.py  # at least after pyfive 1.0

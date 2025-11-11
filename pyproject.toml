@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools >= 40.6.0",
+    "setuptools>=40.6.0",
     "setuptools_scm>=6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Atmospheric Science",
 ]
 dynamic = [
@@ -79,5 +80,3 @@ zip-safe = false  # possibly yes
 
 [tool.setuptools.dynamic]
 readme = {file = "README.md", content-type = "text/markdown"}
-
-

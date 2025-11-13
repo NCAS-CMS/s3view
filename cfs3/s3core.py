@@ -13,19 +13,22 @@ def get_locations(config_file='.mc/config.json'):
     with open(config,'r') as jfile:
         jdata = json.load(jfile)
     jd = jdata['aliases']
-    locations = {x:jd[x] for x in jd if jd[x]['api']=='Cfs34'}
+    locations = {x:jd[x] for x in jd if jd[x]['api']=='S3v4'}
     return locations
 
 
-def get_user_config(target, config_file='.mc/config.json'):
+def get_user_config(target, config_file=None):
     """
     Obtain credentials from user configuration file
     """
+    if config_file is None:
+        config_file = Path.home()/'.mc/config.json'
     options = get_locations(config_file)
     try:
         options = get_locations(config_file)
         return options[target]
     except KeyError:
+
         raise ValueError(f'Minio target [{target}] not found in ~/{config_file}')
 
 

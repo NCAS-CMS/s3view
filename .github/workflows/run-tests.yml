@@ -1,0 +1,48 @@
+
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * *'  # nightly
+
+# Required shell entrypoint to have properly configured bash shell
+defaults:
+  run:
+    shell: bash -l {0}
+
+jobs:
+  linux:
+    runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+      fail-fast: false
+    name: Linux Python ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: cfs3
+          environment-file: environment.yml
+          python-version: ${{ matrix.python-version }}
+          miniforge-version: "latest"
+          use-mamba: true
+      - run: conda --version
+      - run: python -V
+      - run: conda list
+      - run: pip install --use-pep517 -e .
+      - run: conda list
+      - run: which s3view
+      - run: s3view --help
+      # - run: flake8
+      - run: pip install --use-pep517 -e .[test]
+      - run: conda list
+      - run: pytest --ignore=tests/test_p5dump.py --ignore=tests/test_minio_stuff.py  # at least after pyfive 1.0

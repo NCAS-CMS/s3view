@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools >= 40.6.0",
+    "setuptools>=40.6.0",
     "setuptools_scm>=6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -16,10 +16,10 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Atmospheric Science",
 ]
 dynamic = [
@@ -32,8 +32,8 @@ dependencies = [
     'minio',
     'bitmath',
     'cf-python',
-    'pyfive', #@ git+https://github.com/ncas-cms/pyfive.git@optimise',
-    'fsspec'
+    'pyfive',
+    'fsspec',
 ]
 description = "Lightweight tool for investigating data files in an s3 repository"
 license = {text = "BSD License, Version 3-Clause"}
@@ -41,7 +41,7 @@ name = "cfs3"
 requires-python = ">=3.10"
 
 [project.scripts]
-cfs3iew = "cfs3.s3iew:main"
+s3view = "cfs3.s3view:main"
 
 [project.optional-dependencies]
 test = [
@@ -79,5 +79,3 @@ zip-safe = false  # possibly yes
 
 [tool.setuptools.dynamic]
 readme = {file = "README.md", content-type = "text/markdown"}
-
-

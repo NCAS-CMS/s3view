@@ -1,0 +1,26 @@
+---
+name: cfs3
+channels:
+  - conda-forge
+  - nodefaults
+
+dependencies:
+  - python >=3.10
+  - pip !=21.3
+  - bitmath
+  - cf-python
+  - cmd2 >2
+  - fsspec
+  - minio
+  - pyfive
+  - udunits2
+  # for tests
+  - pytest
+  - pytest-html !=2.1.0
+  - pytest-metadata >=1.5.1
+  - pytest-mock
+  - pytest-xdist
+  # for docs
+  - autodocsumm
+  - sphinx
+  - sphinx_rtd_theme

@@ -160,7 +160,14 @@ class s3cmd(cmd2.Cmd):
     """ List of commands that can consume content from an internal pipe "::" """
     allow_redirection = True
 
-    def __init__(self, path=None):
+    def __init__(self, path=None, config_file=None):
+        """
+        Initialise Command Line Environment 
+        Args:
+            path (_type_, optional): This is the initial location from the selection in your config file. Defaults to None.
+            config_file (_type_, optional): This is the location of your S3 configuration(s).
+            Defaults to None (in which case s3view will attempt to find and use ~/.mc/config.json)
+        """
 
         # Set include_ipy to True to enable the "ipy" command which runs an interactive IPython shell
         super().__init__(include_ipy=True)
@@ -181,15 +188,20 @@ class s3cmd(cmd2.Cmd):
         self.prompt = 's3> '
         self.debug = False
         self.alias, self.bucket, self.path = None, None, None
+        self.locations = " ".join(get_locations(config_file))
+        self.buckets = []
+        self.config = config_file
+
         if path is None:
             self.prompt = 's3> '
             self._noloc()
-            self.buckets = None
         else:
             self._navconfig(path)
+
         self.starting = True
         self.mydirs = None
         self.maybe_anon = False
+       
 
         self.hidden_commands = {'eof', '_relative_run_script',
                                 'alias', 'macro', 'edit', 'run_pyscript', 
@@ -213,8 +225,8 @@ class s3cmd(cmd2.Cmd):
         return filtered
        
     def _noloc(self):
-        locations = " ".join(get_locations())
-        self.poutput(_i('Your available minio locations are: ')+locations)
+     
+        self.poutput(_i('Your available minio locations are: ')+self.locations)
         self.poutput(_i('Choose one with "loc x" '))
 
     def _confirm(self, message, default='N'):
@@ -231,28 +243,34 @@ class s3cmd(cmd2.Cmd):
     def _navconfig(self, target):
         """ Unpick a navigation command and configure """
         bits = target.split('/')
+        self.log.debug(f'[navconfig] is seeing {bits}')
         if bits[0] != self.alias:
+            try:
+                self.client = get_client(bits[0], config_file=self.config)
+            except ValueError as e:
+                self.poutput(_err(e))
+                return
             self.alias = bits[0]
             self.prompt = _p(f'{self.alias}> ')
-            try:
-                self.client = get_client(self.alias)
-            except ValueError as e:
-                # FIXME: the error handling for choosing a non-existent bucket is borked
-                self.poutput(_err(e))
-                self.prompt = 's3> '
-                self.bucket = self.alias
-                self.path = None
-                return
 
             try:
-                self.buckets = [b.name for b in self.client.list_buckets()]
+                existing_buckets = self.buckets
+                buckets = self.client.list_buckets()
+                if buckets is not None:
+                    self.buckets = [b.name for b in buckets]
+                else:
+                    self.buckets = []
             except Exception as e:
                 if 'Access Denied' in str(e):
                     self.poutput(_err(f'Access Denied to {self.alias}, you may still be able to cb into anonymous buckets'))
                     self.maybe_anon = True
-                    self.bucket = self.alias
+                    self.bucket = None
                     self.path = None
                     return 
+                else:
+                    self.poutput(_err(e))
+                    self.buckets=existing_buckets
+            self.log.debug(f'[navconfig] buckets set to {self.buckets}')
 
         match len(bits):
             case 1: 
@@ -374,6 +392,7 @@ class s3cmd(cmd2.Cmd):
         """
         line = statement.raw  # get raw input
         self.log.debug(f'[precmd] received: {repr(line)}')
+        self.log.debug(f'[precmd] buckets are {self.buckets}')
 
         if '::' in line:
             lhs, rhs = map(str.strip, line.split('::', 1))
@@ -443,11 +462,12 @@ class s3cmd(cmd2.Cmd):
 
         Information about bucket contents can only be gathered after using the ``cb`` command.
         """
+        self.log.debug(f'[do_lb] Attempting to list buckets for {arg}')
         if arg is not None:
             if arg == "":
                 pass
             elif arg != self.alias:
-                print('doing')
+                self.log.debug(f'[do_lb] renavigating for {arg} given alias {self.aliase}')
                 self._navconfig(arg)
         self.poutput(_i('Buckets:  ')+' '.join(self.buckets))
 
@@ -1054,4 +1074,5 @@ class s3cmd(cmd2.Cmd):
         if not self.starting:
             self.poutput(_err(f'Command not recognised (at alias={self.alias}, bucket={self.bucket}, path={self.path})'))
         self.starting=False
+        self.log.debug('Default command triggered')
         self.do_lb()

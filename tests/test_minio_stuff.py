@@ -1,9 +1,8 @@
 import io
 import os
-import uuid
 import tempfile
 import pytest
-from minio.error import S3Error
+from pathlib import Path
 
 from cfs3 import s3core
 from cfs3.s3up import Uploader
@@ -12,8 +11,14 @@ from cfs3.s3up import Uploader
 def test_get_client_and_basic_ops(fake_mc_config, minio_service, temp_bucket):
     """Test that get_client can create a MinIO client and perform simple ops."""
 
+    # make sure the mocking has worked
+    config_file = Path.home()/'.mc/config.json'
+    with open(config_file,'r') as f:
+        config = f.read()
 
-    # Create a client
+    assert 'fake-alias' in config
+
+    # now test get_client
     client = s3core.get_client("fake-alias")
     assert isinstance(client, type(minio_service))
 

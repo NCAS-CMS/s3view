@@ -10,14 +10,14 @@ import io
 
 cmd2.ansi.allow_style = cmd2.ansi.AllowStyle.NEVER
 
-dummy_config = '{"loc1":{"url":"https://blah.com","accessKey":"a key","secretKey":"b key","api":"Cfs33"}}'
-
+dummy_config = '{"aliases":{"loc1":{"url":"https://blah.com","accessKey":"a key","secretKey":"b key","api":"S3v4"}}}'
 
 # Fixture to initialize cfs3 class with mocked dependencies
 @pytest.fixture
 def mock_cfs3(mocker):
     mocker.patch('cfs3.s3cmd.get_client')
-    mocker.patch('cfs3.s3cmd.get_locations', return_value=json.loads(dummy_config))
+    mocker.patch('cfs3.s3cmd.get_locations', 
+                    return_value=json.loads(dummy_config)['aliases']['loc1'])
     app = s3cmd(path='loc1')
     app.client = MagicMock()
     app.client.list_buckets.return_value = [MagicMock(name='bucket1'), MagicMock(name='bucket2')]
@@ -30,6 +30,7 @@ def mock_cfs3(mocker):
     app.stderr = io.StringIO()
     
     return app
+
 
 # Example test for the initialization
 def test_cfs3_init(mock_cfs3):

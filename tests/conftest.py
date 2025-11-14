@@ -6,10 +6,12 @@ import docker
 import json
 import tempfile
 from minio import Minio
+from minio.error import S3Error
 from requests.exceptions import ConnectionError
 import subprocess
 from .utils.make_test_data import make_test_netcdf_with_coords
 import logging
+
 
 MINIO_IMAGE = "quay.io/minio/minio:latest"
 ACCESS_KEY = "minioadmin"
@@ -103,7 +105,7 @@ def fake_mc_config(monkeypatch):
                 "url": "http://localhost:9000",
                 "accessKey": "minioadmin",
                 "secretKey": "minioadmin",
-                "api": "Cfs34",
+                "api": "S3v4",
                 "lookup": "auto"
             }
         }

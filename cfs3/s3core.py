@@ -4,16 +4,25 @@ import json
 from minio import Minio
 from urllib.parse import quote, unquote
 import sys
+import warnings
 
-def get_locations(config_file='.mc/config.json'):
+def get_locations(config_file=None):
     """ 
     Read config file and find usable locations
     """
-    config = Path.home()/config_file
-    with open(config,'r') as jfile:
+    if config_file is None:
+        config_file = Path.home()/'.mc/config.json'
+
+    with open(config_file,'r') as jfile:
         jdata = json.load(jfile)
     jd = jdata['aliases']
-    locations = {x:jd[x] for x in jd if jd[x]['api']=='S3v4'}
+    locations = {}
+    for k,v in jd.items():
+        api = v.get('api')
+        if api != 'S3v4':
+            warnings.warn(f'WARNING: Found unexpected S3 API {api} for {k} in configuration file {config_file}')
+        else:
+            locations[k]=v
     return locations
 
 
@@ -32,12 +41,12 @@ def get_user_config(target, config_file=None):
         raise ValueError(f'Minio target [{target}] not found in ~/{config_file}')
 
 
-def get_client(alias):
+def get_client(alias, config_file=None):
     """
     Get Minio client from the configuration alias, and patch the 
     client with that alias name
     """
-    credentials = get_user_config(alias)
+    credentials = get_user_config(alias, config_file=config_file)
     secure = False
     if credentials['url'].startswith('https'):
         secure = True

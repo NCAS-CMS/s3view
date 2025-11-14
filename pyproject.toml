@@ -79,3 +79,6 @@ zip-safe = false  # possibly yes
 
 [tool.setuptools.dynamic]
 readme = {file = "README.md", content-type = "text/markdown"}
+
+[tool.setuptools_scm]
+version_scheme = "release-branch-semver"
